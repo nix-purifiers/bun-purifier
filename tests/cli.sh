@@ -131,7 +131,9 @@ loop() {
   (cd "$work/facts" && "$bun" add ms@2.1.3)
   (cd "$work/facts" && fails_with 'Run `bun-purifier lock`' "$cli" prefetch)
   (cd "$work/facts" && "$cli" lock && "$cli" prefetch)
-  sed -i 's/yarnpkg/yarnpkh/' "$work/facts/bun-purifier.lock.json"
+  # Through a copy: macOS's sed takes the word after -i for a backup suffix.
+  sed 's/yarnpkg/yarnpkh/' "$work/facts/bun-purifier.lock.json" > "$work/edited"
+  mv "$work/edited" "$work/facts/bun-purifier.lock.json"
   (cd "$work/facts" && fails_with 'bun-purifier lock --force' "$cli" prefetch)
 }
 
@@ -182,7 +184,7 @@ nix_errors() {
 
 rebuild() {
   local check
-  check=".#checks.$(uname -m)-linux.workspace-project"
+  check=".#checks.$(nix eval --impure --raw --expr builtins.currentSystem).workspace-project"
   nix build --no-link "$check"
   nix build --no-link --rebuild "$check"
 }

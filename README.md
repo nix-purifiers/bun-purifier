@@ -146,7 +146,8 @@ returns
   `release.<name>.tarball` is the path of the file.
 - `fetches`: the download entries of the shared
   [purifier](https://github.com/nix-purifiers/purifier) library that the
-  lock lists, for both systems, as `readLock` gives them.
+  lock lists, for every system the nix-purifiers build for, as `readLock`
+  gives them.
 
 Nix knows every one of these attributes, by name, at evaluation time.
 `bun.lock` lists the project's packages with their directories, and Nix
@@ -191,14 +192,15 @@ records and resolves only the rest.
 
 `bun-purifier lock` then records what Nix cannot derive. It copies the project
 to a temporary directory and installs it into an empty cache once for
-each system the nix-purifiers build for, x86_64-linux and aarch64-linux,
-and compares what bun did with what Nix derives. The lockfile records:
+each system the nix-purifiers build for, x86_64-linux, aarch64-linux and
+aarch64-darwin, and compares what bun did with what Nix derives. The
+lockfile records:
 
 | Field | Why `bun.lock` cannot supply it |
 |---|---|
 | `cachePaths` | bun names prerelease versions and tarball URLs with hashes of its own. |
 | `gitHashes` | `bun.lock` records the commit of a git dependency, not a hash of the checkout. |
-| `notInstalled` | Which packages bun installs on neither system, such as a dependency of a WebAssembly fallback, follows from resolution. |
+| `notInstalled` | Which packages bun installs on none of the systems, such as a dependency of a WebAssembly fallback, follows from resolution. |
 | `defaultRegistry` | The default registry can come from the environment or from configuration in the home directory. |
 | `bunLockHash`, `bunVersion` | They tie the facts to one `bun.lock` and to the bun whose rules name cache entries. |
 

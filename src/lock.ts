@@ -39,11 +39,12 @@ export const LOCK_FILE = "bun-purifier.lock.json";
 const NPM_REGISTRY = "https://registry.npmjs.org/";
 
 // The bun platforms of the Nix systems the nix-purifiers build for,
-// x86_64-linux and aarch64-linux, as the `admits` of the shared library
-// maps them.
+// x86_64-linux, aarch64-linux and aarch64-darwin, as the `admits` of the
+// shared library maps them.
 const PLATFORMS: [os: string, cpu: string][] = [
   ["linux", "x64"],
   ["linux", "arm64"],
+  ["darwin", "arm64"],
 ];
 
 type Meta = { os?: string | string[]; cpu?: string | string[] };

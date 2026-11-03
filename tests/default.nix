@@ -276,9 +276,10 @@ in
     assert lock.problems == [ ];
     assert systemsOf "@esbuild/linux-x64@0.25.0@@@1" == [ "x86_64-linux" ];
     assert systemsOf "@esbuild/linux-arm64@0.25.0@@@1" == [ "aarch64-linux" ];
+    assert systemsOf "@esbuild/darwin-arm64@0.25.0@@@1" == [ "aarch64-darwin" ];
     assert systemsOf "esbuild@0.25.0@@@1" == null;
     assert lib.assertMsg (
-      !(builtins.any (e: lib.hasPrefix "@esbuild/darwin" e.path) lock.entries)
+      !(builtins.any (e: lib.hasPrefix "@esbuild/darwin-x64" e.path) lock.entries)
     ) "readLock kept an entry no system installs";
     assert lock.outputs.fixture-sources.version == "1.0.0";
     marker "read-lock";
