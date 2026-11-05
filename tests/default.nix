@@ -137,6 +137,10 @@ let
   allOf = name: checks: pkgs.runCommand "test-${name}" { inherit checks; } "touch $out";
 in
 {
+  browser-projections = import ./browser-projections.nix {
+    inherit pkgs;
+    build = build;
+  };
   composition-producer = workspace.packages."@fixture/lib";
   npm-projection =
     pkgs.runCommand "bun-npm-projection-check"
