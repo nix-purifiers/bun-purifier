@@ -53,6 +53,7 @@
   # directory above it that also holds the `file:` dependencies outside
   # the project.
   src,
+  webAssets ? { },
   # The project inside `src`, as a relative path; "" when `src` is the
   # project.
   root ? "",
@@ -315,7 +316,7 @@ let
           '';
     in
     lib.extendDerivation true {
-      projections = projectionFor [ p.name ];
+      projections = projectionFor [ p.name ] // webProjectionFor p.name drv p.version;
       executables = lib.mapAttrs (bin: _: "${drv}/bin/${bin}") (bins p);
     } drv
   ) lock.packagesByName;
@@ -394,9 +395,58 @@ let
         python3
         ;
     };
-  projections = projectionFor null;
+  packagesForWeb = packages;
+  ownPackagesForWeb = lock.packagesByName;
+  webProjectionFor =
+    name: package: version:
+    lib.optionalAttrs (builtins.hasAttr name webAssets) (
+      (purifier.resourceProjections {
+        producer = project;
+        roots."." = "${packagePath ownPackagesForWeb.${name}}${webAssets.${name}}";
+        inherit runCommand python3;
+      })
+      // (purifier.webjarProjections {
+        producer = package;
+        assets = "${package}/lib/node_modules/${name}/${webAssets.${name}}";
+        artifactId = builtins.replaceStrings [ "@" "/" ] [ "" "__" ] name;
+        inherit version runCommand python3;
+      })
+    );
+  projections =
+    projectionFor null
+    // lib.optionalAttrs (webAssets != { }) (
+      purifier.jvmProjections {
+        repository = null;
+        dependencies = lib.mapAttrsToList (name: _: packagesForWeb.${name}) webAssets;
+        formats = [
+          "maven"
+          "ivy"
+        ];
+        inherit runCommand python3;
+      }
+    );
 
 in
+assert
+  builtins.all (name: builtins.hasAttr name ownPackagesForWeb) (builtins.attrNames webAssets)
+  || throw "bun-purifier: webAssets must name packages owned by this project";
+assert
+  builtins.all (
+    path:
+    builtins.isString path
+    && path != ""
+    && !lib.hasPrefix "/" path
+    && builtins.all (
+      part:
+      !builtins.elem part [
+        ""
+        "."
+        ".."
+        "node_modules"
+      ]
+    ) (lib.splitString "/" path)
+  ) (builtins.attrValues webAssets)
+  || throw "bun-purifier: webAssets must select relative asset subdirectories, excluding node_modules";
 # checkLock fails evaluation with the problems of the lock, before any
 # attribute of the result is read.
 builtins.seq checkedLock {
