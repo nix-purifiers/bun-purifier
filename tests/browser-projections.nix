@@ -82,7 +82,13 @@ pkgs.runCommand "browser-webjar-ordinary-consumers"
       }
     }
     GRADLE
-    if gradle --offline --no-daemon --stacktrace --info verify; then
+    ${pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
+      # Keep this transport setting local to the WebJar consumer test.
+      export JAVA_TOOL_OPTIONS="''${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Djava.net.preferIPv4Stack=true"
+      selectedJava="''${JAVA_HOME:-${pkgs.gradle.jdk}}/bin/java"
+      "$selectedJava" -XshowSettings:properties -version 2> selected-java-properties.txt
+      grep -E '^[[:space:]]*java.net.preferIPv4Stack = true[[:space:]]*$' selected-java-properties.txt
+    ''}if gradle --offline --no-daemon --stacktrace --info verify; then
       :
     else
       status=$?
