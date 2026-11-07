@@ -33,8 +33,8 @@ work=$(mktemp -d)
 trap 'chmod -R u+w "$work"; rm -rf "$work"' EXIT
 OFFLINE_DIR=${OFFLINE_DIR:-$work/offline}
 
-cli=$(nix build --no-link --print-out-paths '.#bun-purifier')/bin/bun-purifier
-bun=$(nix build --no-link --print-out-paths '.#bun-purifier.bun')/bin/bun
+cli=${BUN_PURIFIER_TEST_CLI:-$(nix build --no-link --print-out-paths '.#bun-purifier')/bin/bun-purifier}
+bun=${BUN_PURIFIER_TEST_BUN:-$(nix build --no-link --print-out-paths '.#bun-purifier.bun')/bin/bun}
 # Package scripts call bun by name.
 PATH=$(dirname "$bun"):$PATH
 
@@ -95,6 +95,25 @@ offline_prefetch() {
 }
 
 offline_loop() {
+  # Start with no installed modules; prefetch provides only the locked cache.
+  # Keep the purifier cache and its GC root under node_modules/.cache.
+  find "$OFFLINE_DIR/node_modules" -mindepth 1 -maxdepth 1 ! -name .cache -exec rm -rf {} +
+  rm -rf "$OFFLINE_DIR/packages/app/node_modules" "$OFFLINE_DIR/packages/lib/node_modules"
+  export BUN_INSTALL_CACHE_DIR="$OFFLINE_DIR/node_modules/.cache/bun-purifier/bun-cache"
+  test -d "$BUN_INSTALL_CACHE_DIR/is-odd@3.0.1@@@1"
+  test ! -e "$OFFLINE_DIR/node_modules/is-odd"
+  export HOME="$work/home"
+  mkdir -p "$HOME"
+  export BUN_TMPDIR="$work/bun-tmp"
+  mkdir -p "$BUN_TMPDIR" "$work/empty-cache"
+  # The same frozen install must fail without the prefetched packages.
+  cp -r tests/fixtures/workspace "$work/empty-project"
+  if (cd "$work/empty-project" && BUN_INSTALL_CACHE_DIR="$work/empty-cache" "$bun" install --frozen-lockfile --offline) > "$work/empty-cache.log" 2>&1; then
+    echo 'offline install unexpectedly succeeded with an empty cache'
+    exit 1
+  fi
+  cat "$work/empty-cache.log"
+  grep -F 'is not in the cache' "$work/empty-cache.log" > /dev/null
   (cd "$OFFLINE_DIR" && "$bun" install)
   (cd "$OFFLINE_DIR/packages/app" && "$bun" run build)
   local actual
