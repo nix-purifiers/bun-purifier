@@ -15,7 +15,7 @@ root = Path('runtime-receipts')
 root.mkdir(exist_ok=True)
 system = capture('nix', 'eval', '--impure', '--raw', '--expr', 'builtins.currentSystem')
 checks = ['unit', 'elysia', 'conformance-offline']
-checks += ['current-stable-runtime'] + ['current-stable-' + name for name in checks]
+checks += ['current-stable-runtime', 'current-stable-sources-program', 'current-stable-conformance-rebuild'] + ['current-stable-' + name for name in checks]
 metadata = {
     'source': capture('git', 'rev-parse', 'HEAD').strip(),
     'system': system,
