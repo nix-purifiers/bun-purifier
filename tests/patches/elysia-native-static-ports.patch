@@ -1,0 +1,14 @@
+--- a/test/adapter/bun/native-static.test.ts
++++ b/test/adapter/bun/native-static.test.ts
+@@ -10,9 +10,9 @@
+ let server: Elysia | undefined
+ 
+ const listen = (app: Elysia, port: number) => {
+-	server = app.listen({ hostname: '127.0.0.1', port })
++	server = app.listen({ hostname: '127.0.0.1', port: 0 })
+ 
+-	return `http://127.0.0.1:${port}`
++	return `http://127.0.0.1:${server.server!.port}`
+ }
+ 
+ afterEach(() => {
