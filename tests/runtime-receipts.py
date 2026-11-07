@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Execute the runtime checks and retain their Nix derivation/output identities."""
 import json
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -49,6 +50,20 @@ for check in checks:
         raise subprocess.CalledProcessError(executed.returncode, command)
     builds = json.loads(executed.stdout)
     paths = [path for build in builds for path in build['outputs'].values()]
+    sample = None
+    if check.endswith('elysia'):
+        derivations = json.loads(capture('nix', 'derivation', 'show', attr))
+        definitions = derivations.get('derivations', derivations)
+        patched_source = next(value['env']['src'] for value in definitions.values()
+                              if 'src' in value.get('env', {}))
+        sample = {
+            'repository': 'elysiajs/elysia',
+            'upstreamRevision': 'e037eca710e7ad193be09cc6615ab0dbe54af914',
+            'modified': True,
+            'modification': 'test-only event-driven stream cancellation synchronization',
+            'patchSha256': hashlib.sha256(Path('tests/patches/elysia-stream-cancellation.patch').read_bytes()).hexdigest(),
+            'patchedSource': json.loads(capture('nix', 'path-info', '--json', patched_source)),
+        }
     record = {
         **metadata,
         'check': attr,
@@ -57,6 +72,7 @@ for check in checks:
         'builds': builds,
         'derivations': json.loads(capture('nix', 'derivation', 'show', attr)),
         'outputs': json.loads(capture('nix', 'path-info', '--json', *paths)),
+        'sample': sample,
     }
     if check == 'current-stable-runtime':
         record['nativeRuntime'] = json.loads(Path(paths[0]).read_text())
