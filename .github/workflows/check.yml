@@ -18,7 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
-      - run: nix flake check -L
+        with:
+          extra_nix_config: |
+            sandbox = true
+      - run: nix flake check --option sandbox true -L
       - name: Execute named runtime derivations and record identities
         run: python3 tests/runtime-receipts.py
       - uses: actions/upload-artifact@v4
@@ -39,6 +42,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            sandbox = true
       - run: bash tests/cli.sh relock
 
   # `bun-purifier update` of a fixture that pins an old version moves
@@ -53,6 +59,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            sandbox = true
       - run: bash tests/cli.sh update
 
   # After `bun-purifier prefetch`, the everyday loop works with the network
@@ -66,6 +75,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            sandbox = true
       - run: bash tests/cli.sh offline-prefetch
         env:
           OFFLINE_DIR: ${{ runner.temp }}/offline
@@ -83,6 +95,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            sandbox = true
       - name: Record native runtime
         run: |
           test "$(uname -m)" = arm64
@@ -117,6 +132,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            sandbox = true
       - run: bash tests/cli.sh loop publish nix-errors rebuild
 
   composition-native:
@@ -128,4 +146,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            sandbox = true
       - run: python3 tests/composition-native.py
