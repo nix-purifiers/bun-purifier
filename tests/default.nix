@@ -354,11 +354,22 @@ in
           pkgs.gzip
         ];
         tests = elysia.tests;
+        # The upstream cancellation test assumes a five millisecond scheduling
+        # margin. Patch only its test synchronization, retaining all assertions.
+        src = pkgs.applyPatches {
+          name = "elysia-stream-test-synchronized";
+          src = projectOf elysia;
+          patches = [ ./patches/elysia-stream-cancellation.patch ];
+        };
+        passthru = {
+          upstreamSample = realWorld.elysia;
+          samplePatch = ./patches/elysia-stream-cancellation.patch;
+        };
       }
       ''
         export HOME=$TMPDIR
         tar -tzf ${elysia.release.elysia.tarball} | grep '^package/dist/index.mjs$' > /dev/null
-        cp -r ${projectOf elysia} elysia
+        cp -r "$src" elysia
         chmod -R u+w elysia
         cd elysia
         bun test

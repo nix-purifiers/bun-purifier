@@ -1,0 +1,87 @@
+--- a/test/response/stream.test.ts
++++ b/test/response/stream.test.ts
+@@ -48,53 +48,40 @@
+ 
+ 	it('stop stream on canceled request', async () => {
+ 		const expected = ['a', 'b']
+-
++		const gate = Promise.withResolvers<void>()
++		const cleanup = Promise.withResolvers<void>()
+ 		const app = new Elysia().get('/', async function* () {
+-			yield 'a'
+-			await Bun.sleep(10)
+-
+-			yield 'b'
+-			await Bun.sleep(10)
+-
+-			yield 'c'
+-		})
+-
++			try {
++				yield 'a'
++				await Bun.sleep(10)
++				yield 'b'
++				await gate.promise
++				yield 'c'
++			} finally {
++				cleanup.resolve()
++			}
++		})
+ 		const controller = new AbortController()
+-
+-		setTimeout(() => {
+-			controller.abort()
+-		}, 15)
+-
+-		const response = await app
+-			.handle(
+-				new Request('http://e.ly', {
+-					signal: controller.signal
+-				})
+-			)
+-			.then((x) => x.body)
+-			.then((x) => {
+-				if (!x) return
+-
+-				const reader = x?.getReader()
+-
+-				let acc = ''
+-				const { promise, resolve } = Promise.withResolvers()
+-
+-				reader.read().then(function pump({ done, value }): unknown {
+-					if (done) return resolve(acc)
+-
+-					expect(value.toString()).toBe(expected.shift()!)
+-
+-					acc += value.toString()
+-					return reader.read().then(pump)
+-				})
+-
+-				return promise
+-			})
+-
++		const response = await app.handle(new Request('http://e.ly', {
++			signal: controller.signal
++		}))
++		const reader = response.body!.getReader()
++		let accumulated = ''
++		for (;;) {
++			const { done, value } = await reader.read()
++			if (done) break
++			expect(value.toString()).toBe(expected.shift()!)
++			accumulated += value.toString()
++			if (expected.length === 0) {
++				controller.abort()
++				gate.resolve()
++			}
++		}
++		await cleanup.promise
+ 		expect(expected).toHaveLength(0)
+-		expect(response).toBe('ab')
+-	})
++		expect(accumulated).toBe('ab')
++		expect(controller.signal.aborted).toBe(true)
++	}, 5000)
+ 
+ 	it('include multiple set-cookie headers in streamed response', async () => {
+ 		const app = new Elysia().get('/', async function* (context) {
