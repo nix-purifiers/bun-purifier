@@ -82,7 +82,13 @@ pkgs.runCommand "browser-webjar-ordinary-consumers"
       }
     }
     GRADLE
-    gradle --offline --no-daemon verify
+    if gradle --offline --no-daemon --stacktrace --info verify; then
+      :
+    else
+      status=$?
+      python ${./gradle-diagnostics.py} --gradle-home "$GRADLE_USER_HOME" --project "$PWD" --tmpdir "$TMPDIR" || true
+      exit "$status"
+    fi
     test -n "$(find ${built.projections.ivy} -name '*.jar')"
     touch $out
   ''
