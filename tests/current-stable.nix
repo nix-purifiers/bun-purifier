@@ -35,6 +35,7 @@ let
   suite = import ./default.nix {
     pkgs = latest;
     inherit readLock realWorld;
+    sourcesLockFile = ./current-stable/sources.lock.json;
     bun-purifier = latest.bun-purifier.bun-purifier;
   };
 in

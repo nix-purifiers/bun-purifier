@@ -14,6 +14,8 @@
   # The sources of the real-world projects, pinned in
   # tests/dependencies/flake.lock.
   realWorld,
+  # Cache names for URL dependencies can change between Bun releases.
+  sourcesLockFile ? ./fixtures/sources/bun-purifier.lock.json,
 }:
 let
   inherit (pkgs) lib;
@@ -29,7 +31,10 @@ let
   # A single package with a GitHub dependency, a tarball URL dependency,
   # and esbuild, whose native binary comes from the optional dependency
   # for the build platform.
-  sources = build { src = ./fixtures/sources; };
+  sources = build {
+    src = ./fixtures/sources;
+    lockFile = sourcesLockFile;
+  };
 
   # Local dependencies and a git dependency: a file: directory inside the
   # project, one outside it (so `src` is the directory above the project),

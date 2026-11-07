@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "bunVersion": "1.4.4",
+  "bunLockHash": "b2a9032e377cfcc651919c06b70d2309f47901d768c6c0e04d515b2bed9b8476",
+  "cachePaths": {
+    "ms": "@T@sha512-e85973b9b4cb646dc9d9afcd54202578@@@1"
+  },
+  "gitHashes": {},
+  "notInstalled": [],
+  "contentHash": "ad59054ea7db5587b715e1c4b6689f084196626f743a13e39de49a884a1efaf7"
+}
