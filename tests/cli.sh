@@ -97,6 +97,9 @@ offline_prefetch() {
 offline_loop() {
   # Start with no installed modules; prefetch provides only the locked cache.
   # Keep the purifier cache and its GC root under node_modules/.cache.
+  # Bun can clone read-only cache directory modes on Darwin. Change only
+  # generated directories: never file modes, cache contents or symlink targets.
+  find "$OFFLINE_DIR/node_modules" -path "$OFFLINE_DIR/node_modules/.cache" -prune -o -type d -exec chmod u+w {} +
   find "$OFFLINE_DIR/node_modules" -mindepth 1 -maxdepth 1 ! -name .cache -exec rm -rf {} +
   rm -rf "$OFFLINE_DIR/packages/app/node_modules" "$OFFLINE_DIR/packages/lib/node_modules"
   export BUN_INSTALL_CACHE_DIR="$OFFLINE_DIR/node_modules/.cache/bun-purifier/bun-cache"
