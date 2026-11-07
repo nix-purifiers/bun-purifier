@@ -15,12 +15,17 @@ def capture(*args):
 subprocess.run(['git', 'diff', '--quiet', 'HEAD'], check=True)
 root = Path('runtime-receipts')
 root.mkdir(exist_ok=True)
+configuration = json.loads(capture('nix', 'config', 'show', '--json', '--option', 'sandbox', 'true'))
+sandbox = configuration['sandbox']['value']
+if sandbox not in ('true', True):
+    raise RuntimeError(f'pure runtime checks require sandbox=true, got {sandbox!r}')
 system = capture('nix', 'eval', '--impure', '--raw', '--expr', 'builtins.currentSystem')
 checks = ['unit', 'elysia', 'conformance-offline']
 checks += ['current-stable-runtime', 'current-stable-sources-program', 'current-stable-conformance-rebuild'] + ['current-stable-' + name for name in checks]
 metadata = {
     'source': capture('git', 'rev-parse', 'HEAD').strip(),
     'system': system,
+    'sandbox': sandbox,
     'machine': capture('uname', '-m').strip(),
     'defaultBun': capture('nix', 'run', '.#bun-purifier.bun', '--', '--version').strip(),
 }
@@ -29,7 +34,7 @@ for check in checks:
     attr = f'.#checks.{system}.{check}'
     # flake check has already realized each output. Rebuild executes the
     # named check again instead of collecting a cached result as runtime proof.
-    command = ['nix', 'build', '--no-link', '--rebuild', '--option', 'max-jobs', '2', '--option', 'cores', '2', '-L', '--json', attr]
+    command = ['nix', 'build', '--no-link', '--rebuild', '--option', 'sandbox', 'true', '--option', 'max-jobs', '2', '--option', 'cores', '2', '-L', '--json', attr]
     try:
         executed = subprocess.run(command, text=True, stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE, timeout=900)
