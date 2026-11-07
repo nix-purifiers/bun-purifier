@@ -12,7 +12,28 @@ import subprocess
 import tempfile
 root = Path(__file__).resolve().parent.parent
 system = subprocess.check_output(['nix','eval','--impure','--raw','--expr','builtins.currentSystem'], text=True).strip()
-snapshot = json.loads(subprocess.check_output(['nix','flake','metadata','--json','--no-write-lock-file','path:'+str(root)], text=True))['path']
+# Archive the Git-aware checkout: metadata can describe an unrealized source
+# on a cold store, and raw path: also admits untracked generated artifacts.
+source_reference = 'git+file://' + str(root)
+original_lock = (root/'flake.lock').read_bytes()
+archived = json.loads(subprocess.check_output([
+    'nix','flake','archive','--json','--no-update-lock-file',source_reference,
+], text=True))
+snapshot = archived['path']
+source_path = Path(snapshot)
+assert source_path.is_dir(), f'archived source is not materialized: {snapshot}'
+assert source_path.resolve(strict=True) == source_path, f'noncanonical source: {snapshot}'
+assert (source_path/'flake.lock').read_bytes() == original_lock
+assert (root/'flake.lock').read_bytes() == original_lock
+source_info = json.loads(subprocess.check_output(['nix','path-info','--json',snapshot],text=True))
+receipt_dir = Path(os.environ.get('BUN_COMPOSITION_RECEIPTS', 'composition-receipts'))
+receipt_dir.mkdir(parents=True,exist_ok=True)
+(receipt_dir/'source.json').write_text(json.dumps({
+    'reference':source_reference,
+    'revision':subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip(),
+    'archive':archived,
+    'materializedSource':source_info,
+},indent=2)+'\n')
 with tempfile.TemporaryDirectory(prefix='bun-native-composition-') as temporary:
     temporary = Path(temporary)
     subprocess.run(['nix-store','--add-root',str(temporary/'source'),'--realise',snapshot],check=True)

@@ -152,3 +152,9 @@ jobs:
           extra_nix_config: |
             sandbox = true
       - run: python3 tests/composition-native.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bun-composition-source-${{ matrix.runner }}
+          path: composition-receipts/
+          retention-days: 14
