@@ -2,6 +2,8 @@
 { pkgs, projection }:
 pkgs.runCommand "ordinary-resource-consumers"
   {
+    __darwinAllowLocalNetworking = pkgs.stdenv.hostPlatform.isDarwin;
+    networkBoundary = import ./sandbox-local-network.nix { inherit pkgs; };
     nativeBuildInputs = [
       pkgs.python3
       pkgs.jdk

@@ -22,6 +22,7 @@ let
 
   build = pkgs.bun-purifier.buildBunProject;
   cli = lib.getExe bun-purifier;
+  localNetworkBoundary = import ./sandbox-local-network.nix { inherit pkgs; };
 
   # A workspace of two packages: a library with registry dependencies (one
   # scoped) and a test, and an app that depends on it through
@@ -142,6 +143,7 @@ let
   allOf = name: checks: pkgs.runCommand "test-${name}" { inherit checks; } "touch $out";
 in
 {
+  sandbox-local-network = localNetworkBoundary;
   browser-projections = import ./browser-projections.nix {
     inherit pkgs;
     build = build;
@@ -150,6 +152,8 @@ in
   npm-projection =
     pkgs.runCommand "bun-npm-projection-check"
       {
+        __darwinAllowLocalNetworking = pkgs.stdenv.hostPlatform.isDarwin;
+        networkBoundary = localNetworkBoundary;
         nativeBuildInputs = [
           pkgs.nodejs
           pkgs.python3
@@ -311,6 +315,8 @@ in
   publish =
     pkgs.runCommand "test-publish"
       {
+        __darwinAllowLocalNetworking = pkgs.stdenv.hostPlatform.isDarwin;
+        networkBoundary = localNetworkBoundary;
         nativeBuildInputs = [
           pkgs.bun
           pkgs.jq
@@ -348,6 +354,8 @@ in
   elysia =
     pkgs.runCommand "test-elysia"
       {
+        __darwinAllowLocalNetworking = pkgs.stdenv.hostPlatform.isDarwin;
+        networkBoundary = localNetworkBoundary;
         nativeBuildInputs = [
           pkgs.bun
           pkgs.gnutar
