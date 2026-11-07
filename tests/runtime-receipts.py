@@ -4,6 +4,7 @@
 import json
 from pathlib import Path
 import subprocess
+import sys
 
 
 def capture(*args):
@@ -27,11 +28,32 @@ for check in checks:
     attr = f'.#checks.{system}.{check}'
     # flake check has already realized each output. Rebuild executes the
     # named check again instead of collecting a cached result as runtime proof.
-    builds = json.loads(capture('nix', 'build', '--no-link', '--rebuild', '--option', 'max-jobs', '2', '--option', 'cores', '2', '-L', '--json', attr))
+    command = ['nix', 'build', '--no-link', '--rebuild', '--option', 'max-jobs', '2', '--option', 'cores', '2', '-L', '--json', attr]
+    try:
+        executed = subprocess.run(command, text=True, stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE, timeout=900)
+    except subprocess.TimeoutExpired as error:
+        (root / (check + '.json')).write_text(json.dumps({
+            **metadata, 'check': attr, 'command': command, 'status': 'timeout',
+            'timeoutSeconds': 900,
+        }, indent=2) + '\n')
+        (root / (check + '.log')).write_bytes(error.stderr or b'')
+        raise
+    (root / (check + '.log')).write_text(executed.stderr)
+    print(executed.stderr, file=sys.stderr, end='')
+    if executed.returncode:
+        (root / (check + '.json')).write_text(json.dumps({
+            **metadata, 'check': attr, 'command': command, 'status': 'failed',
+            'returncode': executed.returncode,
+        }, indent=2) + '\n')
+        raise subprocess.CalledProcessError(executed.returncode, command)
+    builds = json.loads(executed.stdout)
     paths = [path for build in builds for path in build['outputs'].values()]
     record = {
         **metadata,
         'check': attr,
+        'command': command,
+        'status': 'passed',
         'builds': builds,
         'derivations': json.loads(capture('nix', 'derivation', 'show', attr)),
         'outputs': json.loads(capture('nix', 'path-info', '--json', *paths)),
