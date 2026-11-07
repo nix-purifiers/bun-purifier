@@ -8,12 +8,12 @@ on:
 
 jobs:
   # The flake's checks, the sandboxed conformance-* checks among them,
-  # built on each Linux system the flake supports.
+  # built on every system the flake supports.
   flake-check:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-15]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-15]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-15]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -68,6 +68,35 @@ jobs:
         env:
           OFFLINE_DIR: ${{ runner.temp }}/offline
 
+  # macos-15 is a native arm64 runner. Deny all network access after
+  # prefetch; the positive/negative probe checks the isolation itself.
+  conformance-offline-darwin:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - name: Record native runtime
+        run: |
+          test "$(uname -m)" = arm64
+          test "$(nix eval --impure --raw --expr builtins.currentSystem)" = aarch64-darwin
+          nix run '.#bun-purifier.bun' -- --version
+      - run: bash tests/cli.sh offline-prefetch
+        env:
+          OFFLINE_DIR: ${{ runner.temp }}/offline
+      - name: Run ordinary Bun with network denied
+        env:
+          OFFLINE_DIR: ${{ runner.temp }}/offline
+        run: |
+          export BUN_PURIFIER_TEST_CLI="$(nix build --no-link --print-out-paths '.#bun-purifier')/bin/bun-purifier"
+          export BUN_PURIFIER_TEST_BUN="$(nix build --no-link --print-out-paths '.#bun-purifier.bun')/bin/bun"
+          curl --fail --max-time 30 https://registry.npmjs.org/is-odd > /dev/null
+          profile='(version 1) (allow default) (deny network*)'
+          if sandbox-exec -p "$profile" curl --fail --max-time 5 https://registry.npmjs.org/is-odd; then
+            echo 'network isolation failed'
+            exit 1
+          fi
+          sandbox-exec -p "$profile" bash tests/cli.sh offline-loop
+
   # The rest of what needs the network or Nix itself: the everyday loop
   # with its refusals, publishing, the Nix error for a malformed lockfile,
   # and `nix build --rebuild` (conformance-rebuild).
@@ -75,7 +104,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-15]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -86,7 +115,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-15]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
