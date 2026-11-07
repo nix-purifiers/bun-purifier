@@ -21,7 +21,9 @@ if sandbox not in ('true', True):
     raise RuntimeError(f'pure runtime checks require sandbox=true, got {sandbox!r}')
 system = capture('nix', 'eval', '--impure', '--raw', '--expr', 'builtins.currentSystem')
 checks = ['unit', 'elysia', 'conformance-offline']
-checks += ['current-stable-runtime', 'current-stable-sources-program', 'current-stable-conformance-rebuild'] + ['current-stable-' + name for name in checks]
+# Retain executable loopback/external-denial proof with the native artifacts.
+boundary_check = 'sandbox-local-network'
+checks += [boundary_check, 'current-stable-runtime', 'current-stable-sources-program', 'current-stable-conformance-rebuild'] + ['current-stable-' + name for name in checks]
 metadata = {
     'source': capture('git', 'rev-parse', 'HEAD').strip(),
     'system': system,
@@ -79,6 +81,8 @@ for check in checks:
         'outputs': json.loads(capture('nix', 'path-info', '--json', *paths)),
         'sample': sample,
     }
+    if check == boundary_check:
+        record['networkBoundary'] = json.loads(Path(paths[0]).read_text())
     if check == 'current-stable-runtime':
         record['nativeRuntime'] = json.loads(Path(paths[0]).read_text())
     (root / (check + '.json')).write_text(json.dumps(record, indent=2) + '\n')

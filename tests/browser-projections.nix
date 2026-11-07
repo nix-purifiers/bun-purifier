@@ -34,6 +34,8 @@ assert builtins.all (path: !(invalid path).success) [
 ];
 pkgs.runCommand "browser-webjar-ordinary-consumers"
   {
+    __darwinAllowLocalNetworking = pkgs.stdenv.hostPlatform.isDarwin;
+    networkBoundary = import ./sandbox-local-network.nix { inherit pkgs; };
     nativeBuildInputs = [
       pkgs.python3
       pkgs.nodejs
