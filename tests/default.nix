@@ -458,6 +458,9 @@ in
         chmod -R u+w project
         cd project
         ${cli} prefetch
+        # Reproduce Bun's Darwin install directory permissions on every SDK.
+        # Keep cache directories and symlink targets untouched.
+        find node_modules -path node_modules/.cache -prune -o -type d -exec chmod a-w {} +
         cd ..
         mkdir -p tests/fixtures
         cp -r ${./fixtures/workspace} tests/fixtures/workspace
