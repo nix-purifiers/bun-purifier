@@ -58,14 +58,20 @@
         perSystem =
           { pkgs, system, ... }:
           {
-            checks = import ../../../tests {
-              # The fixtures take the builder from the package set that
-              # the default overlay extends.
-              pkgs = pkgs.extend self.overlays.default;
-              inherit (self.lib.bun-purifier) readLock;
-              inherit (self.packages.${system}) bun-purifier;
-              realWorld = { inherit (inputs) elysia; };
-            };
+            checks =
+              (import ../../../tests {
+                # The fixtures take the builder from the package set that
+                # the default overlay extends.
+                pkgs = pkgs.extend self.overlays.default;
+                inherit (self.lib.bun-purifier) readLock;
+                inherit (self.packages.${system}) bun-purifier;
+                realWorld = { inherit (inputs) elysia; };
+              })
+              // (import ../../../tests/current-stable.nix {
+                pkgs = pkgs.extend self.overlays.default;
+                inherit (self.lib.bun-purifier) readLock;
+                realWorld = { inherit (inputs) elysia; };
+              });
             treefmt.programs.nixfmt.enable = true;
           };
       };

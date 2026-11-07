@@ -19,6 +19,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
       - run: nix flake check -L
+      - name: Execute named runtime derivations and record identities
+        run: python3 tests/runtime-receipts.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bun-runtime-${{ matrix.runner }}
+          path: runtime-receipts/
+          retention-days: 14
 
   # Relocking every fixture and elysia reproduces each lockfile byte for
   # byte. A relock needs the network, so it runs here.
