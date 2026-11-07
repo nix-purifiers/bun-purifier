@@ -63,12 +63,15 @@ for check in checks:
         definitions = derivations.get('derivations', derivations)
         patched_source = next(value['env']['src'] for value in definitions.values()
                               if 'src' in value.get('env', {}))
+        patch_paths = json.loads(capture('nix', 'eval', '--json', attr + '.samplePatches'))
         sample = {
             'repository': 'elysiajs/elysia',
             'upstreamRevision': 'e037eca710e7ad193be09cc6615ab0dbe54af914',
             'modified': True,
-            'modification': 'test-only event-driven stream cancellation synchronization',
+            'modification': 'test-only harness patches listed in patches',
             'patchSha256': hashlib.sha256(Path('tests/patches/elysia-stream-cancellation.patch').read_bytes()).hexdigest(),
+            'patches': [{'path': path, 'sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+                        for path in patch_paths],
             'patchedSource': json.loads(capture('nix', 'path-info', '--json', patched_source)),
         }
     record = {

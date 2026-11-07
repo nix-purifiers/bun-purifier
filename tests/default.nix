@@ -23,6 +23,10 @@ let
   build = pkgs.bun-purifier.buildBunProject;
   cli = lib.getExe bun-purifier;
   localNetworkBoundary = import ./sandbox-local-network.nix { inherit pkgs; };
+  elysiaTestPatches = [
+    ./patches/elysia-stream-cancellation.patch
+  ]
+  ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [ ./patches/elysia-native-static-ports.patch ];
 
   # A workspace of two packages: a library with registry dependencies (one
   # scoped) and a test, and an app that depends on it through
@@ -362,16 +366,17 @@ in
           pkgs.gzip
         ];
         tests = elysia.tests;
-        # The upstream cancellation test assumes a five millisecond scheduling
-        # margin. Patch only its test synchronization, retaining all assertions.
+        # Test-only synchronization and Darwin ephemeral-port patches preserve
+        # the upstream assertions. Receipts list every applied patch.
         src = pkgs.applyPatches {
           name = "elysia-stream-test-synchronized";
           src = projectOf elysia;
-          patches = [ ./patches/elysia-stream-cancellation.patch ];
+          patches = elysiaTestPatches;
         };
         passthru = {
           upstreamSample = realWorld.elysia;
           samplePatch = ./patches/elysia-stream-cancellation.patch;
+          samplePatches = elysiaTestPatches;
         };
       }
       ''
