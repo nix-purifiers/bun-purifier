@@ -442,10 +442,13 @@ in
         chmod -R u+w project
         cd project
         ${cli} prefetch
-        bun install
-        (cd packages/app && bun run build)
-        test "$(bun packages/app/dist/main.js)" = "3 is odd: true"
-        (cd packages/lib && bun test)
+        cd ..
+        mkdir -p tests/fixtures
+        cp -r ${./fixtures/workspace} tests/fixtures/workspace
+        export OFFLINE_DIR="$PWD/project"
+        export BUN_PURIFIER_TEST_CLI=${cli}
+        export BUN_PURIFIER_TEST_BUN=${pkgs.bun}/bin/bun
+        bash ${./cli.sh} offline-loop
         touch $out
       '';
 
