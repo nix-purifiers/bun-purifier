@@ -110,8 +110,10 @@ jobs:
         env:
           OFFLINE_DIR: ${{ runner.temp }}/offline
         run: |
-          export BUN_PURIFIER_TEST_CLI="$(nix build --no-link --print-out-paths '.#bun-purifier')/bin/bun-purifier"
-          export BUN_PURIFIER_TEST_BUN="$(nix build --no-link --print-out-paths '.#bun-purifier.bun')/bin/bun"
+          BUN_PURIFIER_TEST_CLI="$(nix build --no-link --print-out-paths '.#bun-purifier')/bin/bun-purifier"
+          export BUN_PURIFIER_TEST_CLI
+          BUN_PURIFIER_TEST_BUN="$(nix build --no-link --print-out-paths '.#bun-purifier.bun')/bin/bun"
+          export BUN_PURIFIER_TEST_BUN
           curl --fail --max-time 30 https://registry.npmjs.org/is-odd > /dev/null
           profile='(version 1) (allow default) (deny network*)'
           if sandbox-exec -p "$profile" curl --fail --max-time 5 https://registry.npmjs.org/is-odd; then
