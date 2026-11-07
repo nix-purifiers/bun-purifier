@@ -108,6 +108,7 @@ offline_loop() {
   mkdir -p "$BUN_TMPDIR" "$work/empty-cache"
   # The same frozen install must fail without the prefetched packages.
   cp -r tests/fixtures/workspace "$work/empty-project"
+  chmod -R u+w "$work/empty-project"
   if (cd "$work/empty-project" && BUN_INSTALL_CACHE_DIR="$work/empty-cache" "$bun" install --frozen-lockfile --offline) > "$work/empty-cache.log" 2>&1; then
     echo 'offline install unexpectedly succeeded with an empty cache'
     exit 1
