@@ -32,6 +32,7 @@ let
   # scoped) and a test, and an app that depends on it through
   # `workspace:*` and bundles itself with `bun build`.
   workspace = build { src = ./fixtures/workspace; };
+  unversionedDevWorkspace = build { src = ./fixtures/unversioned-dev-workspace; };
 
   # A single package with a GitHub dependency, a tarball URL dependency,
   # and esbuild, whose native binary comes from the optional dependency
@@ -147,6 +148,47 @@ let
   allOf = name: checks: pkgs.runCommand "test-${name}" { inherit checks; } "touch $out";
 in
 {
+  unversioned-dev-workspace = pkgs.runCommand "test-unversioned-dev-workspace"
+    { nativeBuildInputs = [ pkgs.bun pkgs.gnutar pkgs.nodejs ]; }
+    ''
+      export HOME="$TMPDIR/home" npm_config_cache="$TMPDIR/npm-cache"
+      mkdir -p "$HOME"
+      cmp ${./fixtures/unversioned-dev-workspace/package.json} ${(projectOf unversionedDevWorkspace)}/package.json
+      mkdir unpacked
+      tar -xf ${(projectOf unversionedDevWorkspace).packs}/fixture-unversioned-dev-workspace/fixture-unversioned-dev-workspace-1.0.0.tgz -C unpacked
+      bun -e '
+        const p = await Bun.file("unpacked/package/package.json").json();
+        if (p.devDependencies["@fixture/tooling"] !== undefined ||
+            p.devDependencies["@fixture/versioned"] !== "^0.2.0" ||
+            p.dependencies["@fixture/runtime"] !== "1.2.3") throw Error("pack dependency metadata changed");
+      '
+      mkdir consumer
+      (
+        cd consumer
+        bun -e 'await Bun.write("package.json", JSON.stringify({private: true, dependencies: {
+          "fixture-unversioned-dev-workspace": "file:${(projectOf unversionedDevWorkspace).packs}/fixture-unversioned-dev-workspace/fixture-unversioned-dev-workspace-1.0.0.tgz",
+          "@fixture/runtime": "file:${(projectOf unversionedDevWorkspace).packs}/_fixture_runtime/fixture-runtime-1.2.3.tgz"
+        }}))'
+        ${pkgs.nodejs}/bin/npm install --offline --ignore-scripts --no-audit --no-fund
+        ${pkgs.nodejs}/bin/node -e 'if (require("fixture-unversioned-dev-workspace") !== 42) throw Error("ordinary consumer failed")'
+      )
+      cp -r ${./fixtures/unversioned-dev-workspace} failure
+      chmod -R u+w failure
+      cd failure
+      bun -e '
+        const p = await Bun.file("package.json").json();
+        p.dependencies["@fixture/tooling"] = "workspace:*";
+        await Bun.write("package.json", JSON.stringify(p));
+      '
+      cp package.json "$TMPDIR/expected.json"
+      mkdir "$TMPDIR/failed-packs"
+      if bun ${../src}/pack.ts "$PWD" "" "$TMPDIR/failed-packs"; then
+        echo "an unversioned runtime workspace must still fail packing" >&2
+        exit 1
+      fi
+      cmp package.json "$TMPDIR/expected.json"
+      touch "$out"
+    '';
   sandbox-local-network = localNetworkBoundary;
   browser-projections = import ./browser-projections.nix {
     inherit pkgs;

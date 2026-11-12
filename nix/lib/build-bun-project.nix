@@ -259,7 +259,7 @@ let
       mkdir -p "$packs"
       ${lib.concatMapStrings (p: ''
         mkdir -p $packs/${packDir p}
-        (cd ./${p.path} && bun pm pack --ignore-scripts --quiet --destination $packs/${packDir p})
+        bun ${../../src}/pack.ts "$PWD" ${lib.escapeShellArg p.path} "$packs/${packDir p}"
       '') namedPackages}
       # The whole source tree, so file: dependencies outside the project
       # come along. bun installs such a dependency as links to its files
