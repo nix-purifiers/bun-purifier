@@ -147,6 +147,18 @@ let
   allOf = name: checks: pkgs.runCommand "test-${name}" { inherit checks; } "touch $out";
 in
 {
+  external-binary-lock =
+    pkgs.runCommand "test-external-binary-lock"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bun
+        ];
+      }
+      ''
+        python3 ${./external-binary-lock.py} --cli ${cli} --bun ${pkgs.bun}/bin/bun --work "$TMPDIR/probe"
+        touch "$out"
+      '';
   sandbox-local-network = localNetworkBoundary;
   browser-projections = import ./browser-projections.nix {
     inherit pkgs;
