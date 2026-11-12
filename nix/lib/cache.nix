@@ -23,6 +23,9 @@
   # The fetchers and packages `fetchEntry` takes by name, passed to it
   # unchanged.
   fetchers,
+  # Sandbox builds patch dependency executables before install hooks run.
+  # A development prefetch leaves these empty and keeps the linked cache.
+  interpreters ? [ ],
 }:
 let
   storeName = import ./store-name.nix;
@@ -46,7 +49,27 @@ let
         printf %s "$rev" > $out/.bun-tag
       '';
 
-  storePath = entry: if entry ? git then withBunTag entry else fetchEntry entry;
+  unpatchedStorePath = entry: if entry ? git then withBunTag entry else fetchEntry entry;
+
+  # Keep one patched store path per dependency, shared by every project
+  # using this interpreter. Copying the entire cache would duplicate all
+  # dependencies in the store for each project.
+  storePath =
+    entry:
+    if interpreters == [ ] then
+      unpatchedStorePath entry
+    else
+      runCommand "${storeName (baseNameOf entry.path)}-bun"
+        {
+          src = unpatchedStorePath entry;
+          nativeBuildInputs = interpreters;
+          preferLocalBuild = true;
+        }
+        ''
+          cp -r --no-dereference "$src" "$out"
+          chmod -R u+w "$out"
+          patchShebangs --build "$out"
+        '';
 in
 # The manifest goes to the builder as a file, since a large project locks
 # thousands of entries and the list would not fit in an environment

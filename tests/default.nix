@@ -36,6 +36,8 @@ let
 
   patched = build { src = ./fixtures/patched; };
 
+  lifecycle = build { src = ./fixtures/lifecycle; };
+
   # A single package with a GitHub dependency, a tarball URL dependency,
   # and esbuild, whose native binary comes from the optional dependency
   # for the build platform.
@@ -218,6 +220,7 @@ in
         bun -e 'if (require(process.env.BUN_PURIFIER_CACHE + "/kleur@4.1.5@@@1/package.json").purifierPatched) throw Error("shared cache was changed")'
         touch $out
       '';
+  lifecycle-prepare = projectOf lifecycle;
   sandbox-local-network = localNetworkBoundary;
   browser-projections = import ./browser-projections.nix {
     inherit pkgs;
