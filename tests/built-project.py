@@ -66,7 +66,16 @@ def main():
     probe = 'const {answer}=await import("./dist/index.js");if(answer!==42)throw Error("bad built artifact");console.log(answer)'
     assert run('built-import', [args.bun, '-e', probe], built).stdout.strip() == '42'
     assert run('rebuilt-import', [args.bun, '-e', probe], rebuilt).stdout.strip() == '42'
-    run('generated-pack', [args.bun, 'pm', 'pack', '--ignore-scripts', '--destination', work / 'packs'], built / 'dist')
+    # Bun 1.4.2 opens package.json for writing even for pack. Use a writable
+    # copy of the actual built distribution, preserving and checking its bytes.
+    distribution = work / 'distribution'
+    shutil.copytree(built / 'dist', distribution)
+    for path in [distribution, *distribution.rglob('*')]:
+        if not path.is_symlink():
+            path.chmod(path.stat().st_mode | stat.S_IWUSR)
+    before_distribution = inventory(distribution)
+    run('generated-pack', [args.bun, 'pm', 'pack', '--ignore-scripts', '--destination', work / 'packs'], distribution)
+    assert inventory(distribution) == before_distribution
     tarballs = list((work / 'packs').glob('*.tgz'))
     assert len(tarballs) == 1
     with tarfile.open(tarballs[0]) as archive:
