@@ -116,7 +116,7 @@ let
   # says `expected`.
   commandFails =
     name: command: expected:
-    pkgs.runCommand "test-${name}-${command}" { } ''
+    pkgs.runCommand "test-${name}-${command}" { nativeBuildInputs = [ pkgs.bun ]; } ''
       export HOME=$TMPDIR
       cp -r ${./negative}/${name} project
       chmod -R u+w project
@@ -430,7 +430,7 @@ in
   # runs it (tests/cli.sh relock). Here `bun-purifier lock` finds every
   # lockfile current, so the command and the Nix library compute the same
   # digests of bun.lock, the manifests and the lockfile.
-  conformance-relock = pkgs.runCommand "test-conformance-relock" { } ''
+  conformance-relock = pkgs.runCommand "test-conformance-relock" { nativeBuildInputs = [ pkgs.bun ]; } ''
     export HOME=$TMPDIR
     cp -r ${./fixtures} fixtures
     cp -r ${./external} external
