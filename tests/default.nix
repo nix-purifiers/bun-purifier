@@ -33,6 +33,8 @@ let
   # `workspace:*` and bundles itself with `bun build`.
   workspace = build { src = ./fixtures/workspace; };
 
+  lifecycle = build { src = ./fixtures/lifecycle; };
+
   # A single package with a GitHub dependency, a tarball URL dependency,
   # and esbuild, whose native binary comes from the optional dependency
   # for the build platform.
@@ -147,6 +149,7 @@ let
   allOf = name: checks: pkgs.runCommand "test-${name}" { inherit checks; } "touch $out";
 in
 {
+  lifecycle-prepare = projectOf lifecycle;
   sandbox-local-network = localNetworkBoundary;
   browser-projections = import ./browser-projections.nix {
     inherit pkgs;

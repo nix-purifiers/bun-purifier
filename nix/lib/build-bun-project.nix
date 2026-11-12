@@ -171,6 +171,10 @@ let
     }
     // fetchers;
     entries = purifier.entriesFor system checkedLock;
+    interpreters = [
+      checkedBun
+      bunAsNode
+    ];
   };
 
   # The offline install, run in the project directory. bun writes into its
@@ -243,6 +247,9 @@ let
       ${lib.optionalString replacesBunLock ''
         install -m 644 ${bunLock} bun.lock
       ''}
+      # Workspace/file dependency executables also need valid interpreters
+      # before Bun runs prepare/postinstall hooks during installation.
+      patchShebangs --build .
       ${installScript}
       patchShebangs --build $(find . -name node_modules -type d -prune)
       runHook postConfigure
