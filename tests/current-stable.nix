@@ -42,6 +42,7 @@ in
 pkgs.lib.mapAttrs' (name: value: pkgs.lib.nameValuePair "current-stable-${name}" value) (
   pkgs.lib.getAttrs [
     "unit"
+    "lifecycle-prepare"
     "elysia"
     "conformance-offline"
     "conformance-rebuild"
