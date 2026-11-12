@@ -43,10 +43,12 @@ import {
   copyFileSync,
   existsSync,
   lstatSync,
+  mkdtempSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   readlinkSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -127,11 +129,31 @@ function withToolLockfile(root: string, outside: string | undefined, write: bool
       if (saved !== undefined) writeFileSync(tree, saved);
       else rmSync(tree, { force: true });
     } finally {
-      rmSync(binary, { force: true });
-      if (binaryLink !== undefined) symlinkSync(binaryLink, binary);
-      else if (savedBinary !== undefined) {
-        writeFileSync(binary, savedBinary);
-        chmodSync(binary, binaryStat!.mode & 0o7777);
+      const current = lstatSync(binary, { throwIfNoEntry: false });
+      let unchanged = false;
+      if (binaryLink !== undefined) {
+        unchanged = current?.isSymbolicLink() === true && readlinkSync(binary) === binaryLink;
+      } else if (savedBinary !== undefined && current?.isFile()) {
+        try {
+          unchanged = (current.mode & 0o7777) === (binaryStat!.mode & 0o7777)
+            && readFileSync(binary).equals(savedBinary);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "EACCES") throw error;
+        }
+      }
+      if (binaryStat === undefined) rmSync(binary, { force: true });
+      else if (!unchanged) {
+        // Prepare the replacement before touching a surviving source path.
+        const temporary = mkdtempSync(join(root, ".bun-lock-restore-"));
+        try {
+          const replacement = join(temporary, "bun.lockb");
+          if (binaryLink !== undefined) symlinkSync(binaryLink, replacement);
+          else {
+            writeFileSync(replacement, savedBinary!);
+            chmodSync(replacement, binaryStat.mode & 0o7777);
+          }
+          renameSync(replacement, binary);
+        } finally { rmSync(temporary, { recursive: true, force: true }); }
       }
     }
   }
