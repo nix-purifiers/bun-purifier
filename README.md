@@ -153,7 +153,7 @@ Nix knows every one of these attributes, by name, at evaluation time.
 `bun.lock` lists the project's packages with their directories, and Nix
 reads the name, version and `bin` field of each from its `package.json`.
 
-`nix/lib/build-bun-project.nix` documents the other arguments:
+`pkgs/build-bun-project/default.nix` documents the other arguments:
 
 - `root`: the project inside `src`, for `file:` dependencies outside the
   project (see Supported language repositories).

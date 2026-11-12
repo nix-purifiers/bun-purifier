@@ -102,7 +102,7 @@ let
   # recomputed, as a bug in the lock would leave it.
   negativeLock =
     name:
-    import ../nix/lib/lock.nix {
+    import ../lib-overlays/default/lock.nix {
       lockFile = ./negative/${name}/bun-purifier.lock.json;
       root = ./negative/${name};
     };

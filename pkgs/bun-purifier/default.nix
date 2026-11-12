@@ -5,7 +5,7 @@
 # observes come from that bun, so `install` and `publish` run the same
 # bun.
 #
-# BUN_PURIFIER_LIB names nix/lib, which `install` and `publish` build
+# BUN_PURIFIER_LIB names pkgs/bun-purifier, which `install` and `publish` build
 # from, and BUN_PURIFIER_NIXPKGS names the nixpkgs of this package set,
 # which those builds import. The builds run the `nix` on the user's PATH.
 # `lock` hashes git dependencies with nix-prefetch-git, which comes with
@@ -28,8 +28,10 @@ stdenvNoCC.mkDerivation {
     root = ../..;
     fileset = lib.fileset.unions [
       ../../src
-      ../../nix/lib
-      # nix/lib/interactive.nix takes the revision of the shared library
+      ./interactive.nix
+      ../../lib-overlays/default
+      ../../pkgs/build-bun-project
+      # pkgs/bun-purifier/interactive.nix takes the revision of the shared library
       # from it.
       ../../flake.lock
     ];
@@ -40,10 +42,10 @@ stdenvNoCC.mkDerivation {
   installPhase = ''
     runHook preInstall
     mkdir -p $out/share/bun-purifier
-    cp -r src nix flake.lock $out/share/bun-purifier/
+    cp -r src lib-overlays pkgs flake.lock $out/share/bun-purifier/
     makeWrapper ${lib.getExe bun} $out/bin/bun-purifier \
       --add-flags $out/share/bun-purifier/src/main.ts \
-      --set BUN_PURIFIER_LIB $out/share/bun-purifier/nix/lib \
+      --set BUN_PURIFIER_LIB $out/share/bun-purifier/pkgs/bun-purifier \
       --set BUN_PURIFIER_NIXPKGS ${path} \
       --set BUN_PURIFIER_PYTHON ${lib.getExe python3} \
       --set BUN_PURIFIER_PROJECT_INPUTS ${purifier.projectInputsTool} \
@@ -56,7 +58,7 @@ stdenvNoCC.mkDerivation {
     makeWrapper ${lib.getExe bun} $out/bin/bun \
       --add-flags $out/share/bun-purifier/src/main.ts \
       --set BUN_PURIFIER_TOOL_WRAPPER 1 \
-      --set BUN_PURIFIER_LIB $out/share/bun-purifier/nix/lib \
+      --set BUN_PURIFIER_LIB $out/share/bun-purifier/pkgs/bun-purifier \
       --set BUN_PURIFIER_NIXPKGS ${path} \
       --set BUN_PURIFIER_PYTHON ${lib.getExe python3} \
       --set BUN_PURIFIER_PROJECT_INPUTS ${purifier.projectInputsTool} \
