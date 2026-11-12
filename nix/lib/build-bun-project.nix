@@ -15,6 +15,9 @@
 # such as `bun`, and `bun-purifier.overrideScope` replaces what everything
 # in the scope shares. The builder returns
 #
+#   builtProject      the configured and built source tree, without packing.
+#                     Native apps may produce their own bundled distribution.
+#                     Requesting it and project can build twice.
 #   packages.<name>   package <name>, built: its directory in the built
 #                     project at `lib/node_modules/<name>`, and the
 #                     executables of its `bin` field in `bin/`, run by bun.
@@ -221,18 +224,13 @@ let
   packDir = p: lock.storeName p.name;
   packagePath = p: "${rootPrefix}${if p.path == "" then "" else "${p.path}/"}";
 
-  # The project after `bun install` and the `buildScript` of each package,
-  # with the tarball of each named package in the output `packs`.
-  project = stdenvNoCC.mkDerivation {
+  # Configure and build identically for native build output and strict packing.
+  projectAttrs = {
     pname = lock.storeName (
       if rootPackage != null && rootPackage ? name then rootPackage.name else "bun-project"
     );
     version = if rootPackage != null && rootPackage ? version then rootPackage.version else "0";
     src = filteredSrc;
-    outputs = [
-      "out"
-      "packs"
-    ];
     nativeBuildInputs = [
       checkedBun
       bunAsNode
@@ -262,32 +260,61 @@ let
       runHook postBuild
     '';
 
-    installPhase = ''
-      runHook preInstall
-      mkdir -p "$packs"
-      ${lib.concatMapStrings (p: ''
-        mkdir -p $packs/${packDir p}
-        bun ${../../src}/pack.ts "$PWD" ${lib.escapeShellArg p.path} "$packs/${packDir p}"
-      '') namedPackages}
-      # The whole source tree, so file: dependencies outside the project
-      # come along. bun installs such a dependency as links to its files
-      # in the build directory; each link into the build directory points
-      # to the same file in $out instead.
-      mkdir -p $out
-      build=$NIX_BUILD_TOP/$sourceRoot
-      cp -r $build/. $out/
-      find $out -type l | while IFS= read -r link; do
-        target=$(readlink "$link")
-        case "$target" in
-          "$build"/*) ln -sfn "$out/''${target#"$build"/}" "$link" ;;
-        esac
-      done
-      runHook postInstall
-    '';
-
     dontFixup = true;
     passthru = { inherit lock cache installScript; };
   };
+
+  copyBuiltTree = ''
+    # The whole source tree, so file: dependencies outside the project
+    # come along. bun installs such a dependency as links to its files
+    # in the build directory; each link into the build directory points
+    # to the same file in $out instead.
+    mkdir -p $out
+    build=$NIX_BUILD_TOP/$sourceRoot
+    cp -r $build/. $out/
+    find $out -type l | while IFS= read -r link; do
+      target=$(readlink "$link")
+      case "$target" in
+        "$build"/*) ln -sfn "$out/''${target#"$build"/}" "$link" ;;
+      esac
+    done
+  '';
+
+  # Preserve the existing strict project and its out/packs outputs.
+  project = stdenvNoCC.mkDerivation (
+    projectAttrs
+    // {
+      outputs = [
+        "out"
+        "packs"
+      ];
+      installPhase = ''
+        runHook preInstall
+        mkdir -p "$packs"
+        ${lib.concatMapStrings (p: ''
+          mkdir -p $packs/${packDir p}
+          bun ${../../src}/pack.ts "$PWD" ${lib.escapeShellArg p.path} "$packs/${packDir p}"
+        '') namedPackages}
+        ${copyBuiltTree}
+        runHook postInstall
+      '';
+
+    }
+  );
+
+  # An additive build-only artifact. Publication remains strict through
+  # project.packs/release; this derivation has no dependency on that pack step.
+  builtProject = stdenvNoCC.mkDerivation (
+    projectAttrs
+    // {
+      outputs = [ "out" ];
+      installPhase = ''
+        runHook preInstall
+        ${copyBuiltTree}
+        runHook postInstall
+      '';
+    }
+  );
 
   # The `bin` field of a package, as a set from executable name to path.
   bins =
@@ -459,6 +486,7 @@ assert
 # attribute of the result is read.
 builtins.seq checkedLock {
   inherit
+    builtProject
     project
     packages
     tests

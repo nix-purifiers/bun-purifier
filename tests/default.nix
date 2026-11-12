@@ -33,6 +33,7 @@ let
   # `workspace:*` and bundles itself with `bun build`.
   workspace = build { src = ./fixtures/workspace; };
   unversionedDevWorkspace = build { src = ./fixtures/unversioned-dev-workspace; };
+  privateNativeBuild = build { src = ./fixtures/private-native-build; };
 
   patched = build { src = ./fixtures/patched; };
 
@@ -152,6 +153,41 @@ let
   allOf = name: checks: pkgs.runCommand "test-${name}" { inherit checks; } "touch $out";
 in
 {
+  built-project =
+    let
+      original = privateNativeBuild.builtProject;
+      second = rebuilt original;
+    in
+    assert original.drvPath != second.drvPath;
+    assert original.outputs == [ "out" ];
+    assert second.outputs == [ "out" ];
+    pkgs.runCommand "test-built-project" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+      python3 ${./built-project.py} \
+        --built ${original} --rebuilt ${second} \
+        --fixture ${./fixtures/private-native-build} \
+        --bun ${pkgs.bun}/bin/bun --pack-helper ${../src}/pack.ts \
+        --work "$TMPDIR/probe" --out "$out"
+    '';
+
+  built-project-legacy-rebuild =
+    let
+      original = projectOf unversionedDevWorkspace;
+      second = rebuilt original;
+    in
+    assert original.drvPath != second.drvPath;
+    assert original.packs.outPath != second.packs.outPath;
+    assert
+      original.outputs == [
+        "out"
+        "packs"
+      ];
+    pkgs.runCommand "test-built-project-legacy-rebuild" { } ''
+      diff -r ${original.packs} ${second.packs}
+      cmp ${./fixtures/unversioned-dev-workspace/package.json} ${original}/package.json
+      cmp ${./fixtures/unversioned-dev-workspace/package.json} ${second}/package.json
+      touch "$out"
+    '';
+
   unversioned-dev-workspace =
     pkgs.runCommand "test-unversioned-dev-workspace"
       {
