@@ -430,23 +430,25 @@ in
   # runs it (tests/cli.sh relock). Here `bun-purifier lock` finds every
   # lockfile current, so the command and the Nix library compute the same
   # digests of bun.lock, the manifests and the lockfile.
-  conformance-relock = pkgs.runCommand "test-conformance-relock" { nativeBuildInputs = [ pkgs.bun ]; } ''
-    export HOME=$TMPDIR
-    cp -r ${./fixtures} fixtures
-    cp -r ${./external} external
-    chmod -R u+w fixtures external
-    # The workspace fixture has no lockfile: bun.lock records everything.
-    test ! -e fixtures/workspace/bun-purifier.lock.json
-    for fixture in sources paths/app registries outdated; do
-      (cd fixtures/$fixture && ${cli} lock) 2> out
-      grep -q "is current" out || { cat out; exit 1; }
-    done
-    (cd external/src && ${cli} lock --lockfile ../bun-purifier.lock.json) 2> out
-    grep -q "is current" out || { cat out; exit 1; }
-    (cd external/src && ${cli} lock --lockfile ../tool/bun-purifier.lock.json --tool-lockfile ../tool/bun.lock) 2> out
-    grep -q "is current" out || { cat out; exit 1; }
-    touch $out
-  '';
+  conformance-relock =
+    pkgs.runCommand "test-conformance-relock" { nativeBuildInputs = [ pkgs.bun ]; }
+      ''
+        export HOME=$TMPDIR
+        cp -r ${./fixtures} fixtures
+        cp -r ${./external} external
+        chmod -R u+w fixtures external
+        # The workspace fixture has no lockfile: bun.lock records everything.
+        test ! -e fixtures/workspace/bun-purifier.lock.json
+        for fixture in sources paths/app registries outdated; do
+          (cd fixtures/$fixture && ${cli} lock) 2> out
+          grep -q "is current" out || { cat out; exit 1; }
+        done
+        (cd external/src && ${cli} lock --lockfile ../bun-purifier.lock.json) 2> out
+        grep -q "is current" out || { cat out; exit 1; }
+        (cd external/src && ${cli} lock --lockfile ../tool/bun-purifier.lock.json --tool-lockfile ../tool/bun.lock) 2> out
+        grep -q "is current" out || { cat out; exit 1; }
+        touch $out
+      '';
 
   # Two builds of the same fixtures give the same output.
   conformance-rebuild = allOf "conformance-rebuild" [
