@@ -102,7 +102,10 @@ def main():
             assert stat.S_IMODE(path.stat().st_mode) == 0o640
         if expected == 0:
             assert outside.is_file()
-            assert json.loads(outside.read_text())["workspaces"][""]["name"] == "binary-lock-fixture"
+            run(name + "-text-lock", [args.bun, "-e",
+                'const lock = Bun.JSONC.parse(await Bun.file(process.argv[1]).text()); '
+                'if (lock.workspaces[""].name !== "binary-lock-fixture") throw Error("wrong captured project");',
+                outside], root)
         else:
             assert b"EEXIST" in result.stderr or b"ENOTDIR" in result.stderr
             assert (locks / "not-a-directory").read_text() == "retained\n"
