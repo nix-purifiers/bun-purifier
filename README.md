@@ -15,6 +15,9 @@ to be committed.
 
 ## Quickstart
 
+Keep your existing Bun runtime on `PATH`. Local capture, prefetch and
+development use that runtime; they do not require a Nix Bun SDK.
+
 From the project root:
 
 ```zsh
@@ -355,9 +358,9 @@ outside.
 
 The lockfile records the version of bun that made it, because the names
 of cache entries follow the rules of that version. A build with a bun of
-another minor version prints a warning. The `bun-purifier` command runs
-the bun of its own package set, so `lock`, `prefetch` and `publish` agree
-with each other.
+another minor version prints a warning. Local lock and prefetch commands
+use the Bun selected from the caller's `PATH`. Optional full sandboxed
+builds and publication select their Nix SDK separately.
 
 ## Examples
 
