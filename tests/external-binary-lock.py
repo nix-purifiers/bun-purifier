@@ -25,9 +25,9 @@ def main():
         (work / name).mkdir()
     environment = {**os.environ, "PATH": str(args.bun.resolve().parent) + os.pathsep + os.environ["PATH"],
                    "HOME": str(work / "home"),
-                   "TMPDIR": str(work / "tmp"), "XDG_CACHE_HOME": str(work / "cache"),
-                   "BUN_INSTALL_CACHE_DIR": str(work / "cache")}
-    for name in ("BUN_PURIFIER_TOOL_LOCKFILE", "BUN_PURIFIER_LOCKFILE", "BUN_PURIFIER_CACHE"):
+                   "TMPDIR": str(work / "tmp"), "XDG_CACHE_HOME": str(work / "cache")}
+    for name in ("BUN_PURIFIER_TOOL_LOCKFILE", "BUN_PURIFIER_LOCKFILE", "BUN_PURIFIER_CACHE",
+                 "BUN_INSTALL_CACHE_DIR"):
         environment.pop(name, None)
 
     def run(name, command, root, expected=0):
@@ -59,7 +59,7 @@ def main():
         output.addfile(entry, io.BytesIO(data))
     (fixture / "local-input.tgz").write_bytes(gzip.compress(archive.getvalue(), mtime=0))
     run("generate", [args.bun, "install", "--offline", "--lockfile-only",
-                     "--ignore-scripts", "--no-progress"], fixture)
+                     "--ignore-scripts", "--no-progress", "--cache-dir=" + str(work / "cache")], fixture)
     binary = (fixture / "bun.lockb").read_bytes()
     assert not (fixture / "bun.lock").exists()
     cases = []
