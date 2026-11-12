@@ -2,13 +2,16 @@
 # SPDX-License-Identifier: MIT
 """External text-lock capture must preserve the caller's binary source lock."""
 import argparse
+import gzip
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import shutil
 import stat
 import subprocess
+import tarfile
 
 
 def main():
@@ -40,11 +43,21 @@ def main():
     (fixture / "packages/child").mkdir(parents=True)
     (fixture / "package.json").write_text(json.dumps({
         "name": "binary-lock-fixture", "version": "1.0.0", "private": True,
+        "dependencies": {"binary-lock-input": "file:./local-input.tgz"},
         "workspaces": ["packages/*"]}) + "\n")
     (fixture / "packages/child/package.json").write_text(json.dumps({
         "name": "binary-lock-child", "version": "1.0.0"}) + "\n")
     (fixture / "bunfig.toml").write_text(
         "[install]\nsaveTextLockfile = false\noffline = true\n")
+    # A local tarball gives the observer a real cache entry without any
+    # registry/network dependency or the separate empty-cache limitation.
+    archive = io.BytesIO()
+    with tarfile.open(fileobj=archive, mode="w") as output:
+        data = json.dumps({"name": "binary-lock-input", "version": "1.0.0"}).encode()
+        entry = tarfile.TarInfo("package/package.json")
+        entry.size, entry.mode, entry.mtime = len(data), 0o644, 0
+        output.addfile(entry, io.BytesIO(data))
+    (fixture / "local-input.tgz").write_bytes(gzip.compress(archive.getvalue(), mtime=0))
     run("generate", [args.bun, "install", "--offline", "--lockfile-only",
                      "--ignore-scripts", "--no-progress"], fixture)
     binary = (fixture / "bun.lockb").read_bytes()
