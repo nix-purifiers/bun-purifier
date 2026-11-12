@@ -53,6 +53,7 @@ import {
 } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { withBoundNpmLock, withNpmInputs, type Repository } from "./npm-inputs";
+import { writablePatches } from "./writable-patches";
 import { isStale, LOCK_FILE, LockError, lock, lockedPackages, readBunLock, readLock } from "./lock";
 
 const usage = `usage:
@@ -226,6 +227,7 @@ function prefetch(root: string, file: string, args: string[], views: Repository[
   makeRemovable(writable);
   rmSync(writable, { recursive: true, force: true });
   linkTree(cache, writable);
+  writablePatches(root, writable);
   withBoundNpmLock(root, views, () =>
     run([process.execPath, "install", "--frozen-lockfile", "--offline", `--cache-dir=${writable}`, ...args], root, setup));
 }

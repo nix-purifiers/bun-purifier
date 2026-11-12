@@ -42,6 +42,8 @@ in
 pkgs.lib.mapAttrs' (name: value: pkgs.lib.nameValuePair "current-stable-${name}" value) (
   pkgs.lib.getAttrs [
     "unit"
+    "patched-dependency"
+    "patched-dependency-prefetch"
     "elysia"
     "conformance-offline"
     "conformance-rebuild"
