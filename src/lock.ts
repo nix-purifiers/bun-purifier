@@ -306,6 +306,8 @@ export function copyProject(root: string, bunLock: BunLock, work: string): strin
 function lockRun(root: string, bunLock: BunLock, bun: string): string {
   const work = mkdtempSync(join(tmpdir(), "bun-purifier-lock-"));
   const cache = join(work, "cache");
+  // Bun need not create a cache when only local workspaces are installed.
+  mkdirSync(cache);
   const project = copyProject(root, bunLock, work);
   for (const [os, cpu] of PLATFORMS) {
     const run = Bun.spawnSync(

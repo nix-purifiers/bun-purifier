@@ -147,6 +147,18 @@ let
   allOf = name: checks: pkgs.runCommand "test-${name}" { inherit checks; } "touch $out";
 in
 {
+  workspace-only-lock =
+    pkgs.runCommand "test-workspace-only-lock"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bun
+        ];
+      }
+      ''
+        python3 ${./workspace-only-lock.py} --cli ${cli} --bun ${pkgs.bun}/bin/bun --work "$TMPDIR/probe"
+        touch "$out"
+      '';
   sandbox-local-network = localNetworkBoundary;
   browser-projections = import ./browser-projections.nix {
     inherit pkgs;
