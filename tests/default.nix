@@ -34,6 +34,8 @@ let
   workspace = build { src = ./fixtures/workspace; };
   unversionedDevWorkspace = build { src = ./fixtures/unversioned-dev-workspace; };
 
+  patched = build { src = ./fixtures/patched; };
+
   # A single package with a GitHub dependency, a tarball URL dependency,
   # and esbuild, whose native binary comes from the optional dependency
   # for the build platform.
@@ -195,6 +197,26 @@ in
         fi
         cmp package.json "$TMPDIR/expected.json"
         touch "$out"
+      '';
+  patched-dependency = projectOf patched;
+  patched-dependency-prefetch =
+    pkgs.runCommand "test-patched-dependency-prefetch"
+      {
+        nativeBuildInputs = [ pkgs.bun ];
+        BUN_PURIFIER_CACHE = (projectOf patched).cache;
+      }
+      ''
+        export HOME=$TMPDIR/home
+        mkdir -p "$HOME"
+        cp -r ${./fixtures/patched} project
+        chmod -R u+w project
+        cd project
+        ${cli} prefetch
+        bun run build
+        # Only the patched cache entry is materialized, never its store target.
+        test ! -L node_modules/.cache/bun-purifier/bun-cache/kleur@4.1.5@@@1
+        bun -e 'if (require(process.env.BUN_PURIFIER_CACHE + "/kleur@4.1.5@@@1/package.json").purifierPatched) throw Error("shared cache was changed")'
+        touch $out
       '';
   sandbox-local-network = localNetworkBoundary;
   browser-projections = import ./browser-projections.nix {

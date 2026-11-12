@@ -183,6 +183,7 @@ let
   installScript = ''
     cp -r --no-dereference ${cache} $TMPDIR/bun-cache
     chmod -R u+w $TMPDIR/bun-cache
+    bun ${../../src}/writable-patches.ts "$PWD" "$TMPDIR/bun-cache"
     ${
       lib.optionalString (dependencies != [ ]) ''
         bun ${../../src}/install-inputs.ts "$PWD" ${inputRepository.catalog} ${inputRepository} \
