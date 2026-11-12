@@ -20,7 +20,8 @@ def main():
     work.mkdir(parents=True, exist_ok=False)
     for name in ("home", "tmp", "cache"):
         (work / name).mkdir()
-    environment = {**os.environ, "HOME": str(work / "home"),
+    environment = {**os.environ, "PATH": str(args.bun.resolve().parent) + os.pathsep + os.environ["PATH"],
+                   "HOME": str(work / "home"),
                    "TMPDIR": str(work / "tmp"), "XDG_CACHE_HOME": str(work / "cache"),
                    "BUN_INSTALL_CACHE_DIR": str(work / "cache")}
     for name in ("BUN_PURIFIER_TOOL_LOCKFILE", "BUN_PURIFIER_LOCKFILE", "BUN_PURIFIER_CACHE"):
