@@ -42,6 +42,8 @@ in
 pkgs.lib.mapAttrs' (name: value: pkgs.lib.nameValuePair "current-stable-${name}" value) (
   pkgs.lib.getAttrs [
     "unit"
+    "built-project"
+    "built-project-legacy-rebuild"
     "unversioned-dev-workspace"
     "elysia"
     "conformance-offline"
