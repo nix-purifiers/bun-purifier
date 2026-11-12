@@ -102,13 +102,18 @@ function run(argv: string[], cwd: string, setup = false, variables: Record<strin
 }
 
 // Runs `body` with the bun.lock kept outside the tree in place of the
-// bun.lock in the tree, and restores the bun.lock in the tree afterwards,
+// bun.lock in the tree, and restores both source lockfiles afterwards,
 // also when `body` fails. With `write`, the bun.lock that `body` leaves
 // goes to the outside path.
 function withToolLockfile(root: string, outside: string | undefined, write: boolean, body: () => void): void {
   if (outside === undefined) return body();
   const tree = join(root, "bun.lock");
   const saved = existsSync(tree) ? readFileSync(tree) : undefined;
+  // Saving a text lock can remove bun.lockb, even with --lockfile-only.
+  const binary = join(root, "bun.lockb");
+  const binaryStat = lstatSync(binary, { throwIfNoEntry: false });
+  const binaryLink = binaryStat?.isSymbolicLink() ? readlinkSync(binary) : undefined;
+  const savedBinary = binaryStat && binaryLink === undefined ? readFileSync(binary) : undefined;
   if (existsSync(outside)) copyFileSync(outside, tree);
   else if (!write) fail(`${outside} does not exist. Run \`bun-purifier lock --tool-lockfile ${outside}\` to write it.`);
   try {
@@ -118,8 +123,17 @@ function withToolLockfile(root: string, outside: string | undefined, write: bool
       copyFileSync(tree, outside);
     }
   } finally {
-    if (saved !== undefined) writeFileSync(tree, saved);
-    else rmSync(tree, { force: true });
+    try {
+      if (saved !== undefined) writeFileSync(tree, saved);
+      else rmSync(tree, { force: true });
+    } finally {
+      rmSync(binary, { force: true });
+      if (binaryLink !== undefined) symlinkSync(binaryLink, binary);
+      else if (savedBinary !== undefined) {
+        writeFileSync(binary, savedBinary);
+        chmodSync(binary, binaryStat!.mode & 0o7777);
+      }
+    }
   }
 }
 
