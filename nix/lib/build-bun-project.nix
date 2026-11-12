@@ -451,6 +451,7 @@ assert
 # attribute of the result is read.
 builtins.seq checkedLock {
   inherit
+    project
     packages
     tests
     release
