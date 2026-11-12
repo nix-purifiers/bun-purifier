@@ -24,14 +24,14 @@ def main():
     (root / "packages/child/package.json").write_text(json.dumps({
         "name": "workspace-only-child", "version": "1.0.0"}) + "\n")
     (root / "bunfig.toml").write_text("[install]\noffline = true\n")
-    for name in ("home", "tmp", "caller-cache", "locks"):
+    for name in ("home", "tmp", "caller-cache", "runtime-cache", "locks"):
         (work / name).mkdir()
     sentinel = work / "caller-cache/sentinel"
     sentinel.write_text("unchanged\n")
     environment = {**os.environ,
                    "PATH": str(args.bun.resolve().parent) + os.pathsep + os.environ["PATH"],
                    "HOME": str(work / "home"), "TMPDIR": str(work / "tmp"),
-                   "XDG_CACHE_HOME": str(work / "caller-cache"),
+                   "XDG_CACHE_HOME": str(work / "runtime-cache"),
                    "BUN_INSTALL_CACHE_DIR": str(work / "caller-cache")}
     for name in ("BUN_PURIFIER_TOOL_LOCKFILE", "BUN_PURIFIER_LOCKFILE", "BUN_PURIFIER_CACHE"):
         environment.pop(name, None)
@@ -63,7 +63,7 @@ def main():
         'if (Object.keys(lock.packages).length !== 1) throw Error("expected only the local workspace link");',
         outside])
     result = {"status": "passed", "scope": "Synthetic workspace-only capture, not a root with no Bun lock",
-              "sourcePreserved": True, "callerCachePreserved": True,
+              "sourcePreserved": True, "callerInstallCachePreserved": True,
               "externalTextLockSha256": hashlib.sha256(outside.read_bytes()).hexdigest(),
               "supplementaryFactsNeeded": False}
     (work / "result.json").write_text(json.dumps(result, indent=2) + "\n")
