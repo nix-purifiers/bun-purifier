@@ -38,6 +38,7 @@ let
   patched = build { src = ./fixtures/patched; };
 
   lifecycle = build { src = ./fixtures/lifecycle; };
+  sameName = build { src = ./fixtures/root-workspace-same-name; };
 
   # A single package with a GitHub dependency, a tarball URL dependency,
   # and esbuild, whose native binary comes from the optional dependency
@@ -257,9 +258,51 @@ in
         touch $out
       '';
   lifecycle-prepare = projectOf lifecycle;
+  package-path-identity =
+    let
+      rootPackage = sameName.packagesByPath."";
+      publicPackage = sameName.packages.fixture-collision;
+      reader = readLock { src = ./fixtures/root-workspace-same-name; };
+      invalid = build { src = ./fixtures/duplicate-workspace-names; };
+      invalidReader = readLock { src = ./fixtures/duplicate-workspace-names; };
+    in
+    assert rootPackage.package.path == "" && rootPackage.package.private;
+    assert publicPackage.package.path == "packages/public";
+    assert !(publicPackage.package.private or false);
+    assert rootPackage.package.version == "1.0.0" && publicPackage.package.version == "1.0.0";
+    assert publicPackage.outPath == sameName.packagesByPath."packages/public".outPath;
+    assert rootPackage.outPath != publicPackage.outPath;
+    assert !(rootPackage ? projections) && !(sameName.releaseByPath."" ? projections);
+    assert reader.outputs.fixture-collision.path == "packages/public";
+    assert builtins.any (
+      message: lib.hasInfix "workspace name 'fixture-collision'" message
+    ) invalidReader.problems;
+    assert !(builtins.tryEval invalid.project.drvPath).success;
+    pkgs.runCommand "test-package-path-identity"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bun
+        ];
+      }
+      ''
+        python3 ${./package-path-identity.py} \
+          --bun ${pkgs.bun}/bin/bun \
+          --project ${sameName.project} --packs ${sameName.project.packs} \
+          --root-tar ${sameName.releaseByPath."".tarball} \
+          --public-tar ${sameName.release.fixture-collision.tarball} \
+          --root-bin ${rootPackage}/bin/fixture-collision \
+          --public-bin ${publicPackage}/bin/fixture-collision --work "$TMPDIR/probe"
+        touch "$out"
+      '';
   binary-lock-shebangs =
     pkgs.runCommand "test-binary-lock-shebangs"
-      { nativeBuildInputs = [ pkgs.python3 pkgs.bun ]; }
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bun
+        ];
+      }
       ''
         export HOME=$TMPDIR/home BUN_INSTALL_CACHE_DIR=$TMPDIR/cache
         mkdir -p "$HOME" "$BUN_INSTALL_CACHE_DIR"
