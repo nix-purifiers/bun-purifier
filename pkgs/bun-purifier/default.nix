@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: MIT
 #
-# The bun-purifier command (src/main.ts), run by the package set's bun.
-# The lock records the version of that bun, and the cache names it
-# observes come from that bun, so `install` and `publish` run the same
-# bun.
+# Local commands adopt the caller's Bun from PATH. Capture, observation
+# and offline installation keep that executable; sandboxed publication
+# selects its SDK separately.
 #
 # BUN_PURIFIER_LIB names nix/lib, which `install` and `publish` build
 # from, and BUN_PURIFIER_NIXPKGS names the nixpkgs of this package set,
@@ -15,6 +14,7 @@
   purifier,
   stdenvNoCC,
   makeWrapper,
+  runtimeShell,
   bun,
   python3,
   nix-prefetch-git,
@@ -41,7 +41,10 @@ stdenvNoCC.mkDerivation {
     runHook preInstall
     mkdir -p $out/share/bun-purifier
     cp -r src nix flake.lock $out/share/bun-purifier/
-    makeWrapper ${lib.getExe bun} $out/bin/bun-purifier \
+    makeWrapper ${runtimeShell} $out/bin/bun-purifier \
+      --add-flags $out/share/bun-purifier/src/host-bun.sh \
+      --add-flags $out/bin/bun \
+      --add-flags $out/share/bun-purifier/src/host-bootstrap.mjs \
       --add-flags $out/share/bun-purifier/src/main.ts \
       --set BUN_PURIFIER_LIB $out/share/bun-purifier/nix/lib \
       --set BUN_PURIFIER_NIXPKGS ${path} \
@@ -49,11 +52,13 @@ stdenvNoCC.mkDerivation {
       --set BUN_PURIFIER_PROJECT_INPUTS ${purifier.projectInputsTool} \
       --prefix PATH : ${
         lib.makeBinPath [
-          bun
           nix-prefetch-git
         ]
       }
-    makeWrapper ${lib.getExe bun} $out/bin/bun \
+    makeWrapper ${runtimeShell} $out/bin/bun \
+      --add-flags $out/share/bun-purifier/src/host-bun.sh \
+      --add-flags $out/bin/bun \
+      --add-flags $out/share/bun-purifier/src/host-bootstrap.mjs \
       --add-flags $out/share/bun-purifier/src/main.ts \
       --set BUN_PURIFIER_TOOL_WRAPPER 1 \
       --set BUN_PURIFIER_LIB $out/share/bun-purifier/nix/lib \
@@ -62,13 +67,14 @@ stdenvNoCC.mkDerivation {
       --set BUN_PURIFIER_PROJECT_INPUTS ${purifier.projectInputsTool} \
       --prefix PATH : ${
         lib.makeBinPath [
-          bun
           nix-prefetch-git
         ]
       }
     runHook postInstall
   '';
 
+  # Retain the package set's SDK as a pure-build convenience, not a
+  # dependency or admission requirement of the local launcher.
   passthru = { inherit bun; };
 
   meta = {
