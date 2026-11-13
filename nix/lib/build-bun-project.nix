@@ -248,9 +248,10 @@ let
       ''}
       # Workspace/file dependency executables also need valid interpreters
       # before Bun runs prepare/postinstall hooks during installation.
-      patchShebangs --build .
+      source ${./patch-shebangs.sh}
+      patchBunShebangs .
       ${installScript}
-      patchShebangs --build $(find . -name node_modules -type d -prune)
+      patchBunShebangs .
       runHook postConfigure
     '';
 
