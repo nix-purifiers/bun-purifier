@@ -257,6 +257,18 @@ in
         touch $out
       '';
   lifecycle-prepare = projectOf lifecycle;
+  binary-lock-shebangs =
+    pkgs.runCommand "test-binary-lock-shebangs"
+      { nativeBuildInputs = [ pkgs.python3 pkgs.bun ]; }
+      ''
+        export HOME=$TMPDIR/home BUN_INSTALL_CACHE_DIR=$TMPDIR/cache
+        mkdir -p "$HOME" "$BUN_INSTALL_CACHE_DIR"
+        python3 ${./binary-lock-shebangs.py} prepare "$TMPDIR/fixture" ${pkgs.bun}/bin/bun
+        source ${../nix/lib/patch-shebangs.sh}
+        patchBunShebangs "$TMPDIR/fixture"
+        python3 ${./binary-lock-shebangs.py} verify "$TMPDIR/fixture" ${pkgs.bun}/bin/bun
+        touch "$out"
+      '';
   external-binary-lock =
     pkgs.runCommand "test-external-binary-lock"
       {
