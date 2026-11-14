@@ -306,6 +306,8 @@ export function copyProject(root: string, bunLock: BunLock, work: string): strin
 function lockRun(root: string, bunLock: BunLock, bun: string): string {
   const work = mkdtempSync(join(tmpdir(), "bun-purifier-lock-"));
   const cache = join(work, "cache");
+  // Bun need not create a cache when only local workspaces are installed.
+  mkdirSync(cache);
   const project = copyProject(root, bunLock, work);
   for (const [os, cpu] of PLATFORMS) {
     const run = Bun.spawnSync(
@@ -319,7 +321,14 @@ function lockRun(root: string, bunLock: BunLock, bun: string): string {
         `--os=${os}`,
         `--cpu=${cpu}`,
       ],
-      { cwd: project, stdout: "inherit", stderr: "inherit" },
+      {
+        cwd: project,
+        // Bun gives this environment setting precedence over --cache-dir.
+        // Observation must inspect the private cache populated by this run.
+        env: { ...process.env, BUN_INSTALL_CACHE_DIR: cache },
+        stdout: "inherit",
+        stderr: "inherit",
+      },
     );
     if (run.exitCode !== 0) {
       rmSync(work, { recursive: true, force: true });
