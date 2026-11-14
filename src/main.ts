@@ -55,6 +55,7 @@ import {
 } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { withBoundNpmLock, withNpmInputs, type Repository } from "./npm-inputs";
+import { writablePatches } from "./writable-patches";
 import { isStale, LOCK_FILE, LockError, lock, lockedPackages, readBunLock, readLock } from "./lock";
 
 const usage = `usage:
@@ -97,8 +98,8 @@ function findRoot(command: string, outsideBunLock: boolean): string {
   fail("no bun.lock in this directory or above it.");
 }
 
-function run(argv: string[], cwd: string, setup = false): void {
-  const result = Bun.spawnSync(argv, { cwd, stdout: setup ? 2 : "inherit", stderr: "inherit", stdin: "inherit" });
+function run(argv: string[], cwd: string, setup = false, variables: Record<string, string | undefined> = process.env): void {
+  const result = Bun.spawnSync(argv, { cwd, env: variables, stdout: setup ? 2 : "inherit", stderr: "inherit", stdin: "inherit" });
   if (result.exitCode !== 0) throw new Exit(result.exitCode ?? 1);
 }
 
@@ -262,8 +263,12 @@ function prefetch(root: string, file: string, args: string[], views: Repository[
   makeRemovable(writable);
   rmSync(writable, { recursive: true, force: true });
   linkTree(cache, writable);
+  writablePatches(root, writable);
+  // Bun prioritizes this variable over --cache-dir. Keep the offline
+  // install on the prepared cache even when the caller configured another.
   withBoundNpmLock(root, views, () =>
-    run([process.execPath, "install", "--frozen-lockfile", "--offline", `--cache-dir=${writable}`, ...args], root, setup));
+    run([process.execPath, "install", "--frozen-lockfile", "--offline", `--cache-dir=${writable}`, ...args], root, setup,
+      { ...process.env, BUN_INSTALL_CACHE_DIR: writable }));
 }
 
 function publish(root: string, file: string, args: string[], composed = false): void {

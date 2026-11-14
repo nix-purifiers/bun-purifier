@@ -42,7 +42,16 @@ in
 pkgs.lib.mapAttrs' (name: value: pkgs.lib.nameValuePair "current-stable-${name}" value) (
   pkgs.lib.getAttrs [
     "unit"
+    "built-project"
+    "built-project-legacy-rebuild"
+    "unversioned-dev-workspace"
+    "patched-dependency"
+    "patched-dependency-prefetch"
+    "lifecycle-prepare"
+    "package-path-identity"
+    "binary-lock-shebangs"
     "external-binary-lock"
+    "workspace-only-lock"
     "elysia"
     "conformance-offline"
     "conformance-rebuild"
