@@ -1,0 +1,9 @@
+{
+  "name": "fixture-lifecycle",
+  "version": "1.0.0",
+  "devDependencies": { "husky": "9.1.7" },
+  "scripts": {
+    "prepare": "bun --bun husky && bun -e 'Bun.write(\"prepared\", \"yes\")'",
+    "build": "bun -e 'if (await Bun.file(\"prepared\").text() !== \"yes\") process.exit(1)'"
+  }
+}

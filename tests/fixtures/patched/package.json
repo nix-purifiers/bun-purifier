@@ -1,0 +1,13 @@
+{
+  "name": "fixture-patched",
+  "version": "1.0.0",
+  "dependencies": {
+    "kleur": "4.1.5"
+  },
+  "scripts": {
+    "build": "bun -e 'if (require(\"kleur/package.json\").purifierPatched !== true) throw Error(\"dependency patch missing\")'"
+  },
+  "patchedDependencies": {
+    "kleur@4.1.5": "patches/kleur@4.1.5.patch"
+  }
+}

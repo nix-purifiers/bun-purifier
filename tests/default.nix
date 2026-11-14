@@ -33,6 +33,12 @@ let
   # `workspace:*` and bundles itself with `bun build`.
   workspace = build { src = ./fixtures/workspace; };
   unversionedDevWorkspace = build { src = ./fixtures/unversioned-dev-workspace; };
+  privateNativeBuild = build { src = ./fixtures/private-native-build; };
+
+  patched = build { src = ./fixtures/patched; };
+
+  lifecycle = build { src = ./fixtures/lifecycle; };
+  sameName = build { src = ./fixtures/root-workspace-same-name; };
 
   # A single package with a GitHub dependency, a tarball URL dependency,
   # and esbuild, whose native binary comes from the optional dependency
@@ -117,7 +123,7 @@ let
   # says `expected`.
   commandFails =
     name: command: expected:
-    pkgs.runCommand "test-${name}-${command}" { } ''
+    pkgs.runCommand "test-${name}-${command}" { nativeBuildInputs = [ pkgs.bun ]; } ''
       export HOME=$TMPDIR
       cp -r ${./negative}/${name} project
       chmod -R u+w project
@@ -148,6 +154,41 @@ let
   allOf = name: checks: pkgs.runCommand "test-${name}" { inherit checks; } "touch $out";
 in
 {
+  built-project =
+    let
+      original = privateNativeBuild.builtProject;
+      second = rebuilt original;
+    in
+    assert original.drvPath != second.drvPath;
+    assert original.outputs == [ "out" ];
+    assert second.outputs == [ "out" ];
+    pkgs.runCommand "test-built-project" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+      python3 ${./built-project.py} \
+        --built ${original} --rebuilt ${second} \
+        --fixture ${./fixtures/private-native-build} \
+        --bun ${pkgs.bun}/bin/bun --pack-helper ${../src}/pack.ts \
+        --work "$TMPDIR/probe" --out "$out"
+    '';
+
+  built-project-legacy-rebuild =
+    let
+      original = projectOf unversionedDevWorkspace;
+      second = rebuilt original;
+    in
+    assert original.drvPath != second.drvPath;
+    assert original.packs.outPath != second.packs.outPath;
+    assert
+      original.outputs == [
+        "out"
+        "packs"
+      ];
+    pkgs.runCommand "test-built-project-legacy-rebuild" { } ''
+      diff -r ${original.packs} ${second.packs}
+      cmp ${./fixtures/unversioned-dev-workspace/package.json} ${original}/package.json
+      cmp ${./fixtures/unversioned-dev-workspace/package.json} ${second}/package.json
+      touch "$out"
+    '';
+
   unversioned-dev-workspace =
     pkgs.runCommand "test-unversioned-dev-workspace"
       {
@@ -194,6 +235,105 @@ in
           exit 1
         fi
         cmp package.json "$TMPDIR/expected.json"
+        touch "$out"
+      '';
+  patched-dependency = projectOf patched;
+  patched-dependency-prefetch =
+    pkgs.runCommand "test-patched-dependency-prefetch"
+      {
+        nativeBuildInputs = [ pkgs.bun ];
+        BUN_PURIFIER_CACHE = (projectOf patched).cache;
+      }
+      ''
+        export HOME=$TMPDIR/home
+        mkdir -p "$HOME"
+        cp -r ${./fixtures/patched} project
+        chmod -R u+w project
+        cd project
+        ${cli} prefetch
+        bun run build
+        # Only the patched cache entry is materialized, never its store target.
+        test ! -L node_modules/.cache/bun-purifier/bun-cache/kleur@4.1.5@@@1
+        bun -e 'if (require(process.env.BUN_PURIFIER_CACHE + "/kleur@4.1.5@@@1/package.json").purifierPatched) throw Error("shared cache was changed")'
+        touch $out
+      '';
+  lifecycle-prepare = projectOf lifecycle;
+  package-path-identity =
+    let
+      rootPackage = sameName.packagesByPath."";
+      publicPackage = sameName.packages.fixture-collision;
+      reader = readLock { src = ./fixtures/root-workspace-same-name; };
+      invalid = build { src = ./fixtures/duplicate-workspace-names; };
+      invalidReader = readLock { src = ./fixtures/duplicate-workspace-names; };
+    in
+    assert rootPackage.package.path == "" && rootPackage.package.private;
+    assert publicPackage.package.path == "packages/public";
+    assert !(publicPackage.package.private or false);
+    assert rootPackage.package.version == "1.0.0" && publicPackage.package.version == "1.0.0";
+    assert publicPackage.outPath == sameName.packagesByPath."packages/public".outPath;
+    assert rootPackage.outPath != publicPackage.outPath;
+    assert !(rootPackage ? projections) && !(sameName.releaseByPath."" ? projections);
+    assert reader.outputs.fixture-collision.path == "packages/public";
+    assert builtins.any (
+      message: lib.hasInfix "workspace name 'fixture-collision'" message
+    ) invalidReader.problems;
+    assert !(builtins.tryEval invalid.project.drvPath).success;
+    pkgs.runCommand "test-package-path-identity"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bun
+        ];
+      }
+      ''
+        python3 ${./package-path-identity.py} \
+          --bun ${pkgs.bun}/bin/bun \
+          --project ${sameName.project} --packs ${sameName.project.packs} \
+          --root-tar ${sameName.releaseByPath."".tarball} \
+          --public-tar ${sameName.release.fixture-collision.tarball} \
+          --root-bin ${rootPackage}/bin/fixture-collision \
+          --public-bin ${publicPackage}/bin/fixture-collision --work "$TMPDIR/probe"
+        touch "$out"
+      '';
+  binary-lock-shebangs =
+    pkgs.runCommand "test-binary-lock-shebangs"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bun
+        ];
+      }
+      ''
+        export HOME=$TMPDIR/home BUN_INSTALL_CACHE_DIR=$TMPDIR/cache
+        mkdir -p "$HOME" "$BUN_INSTALL_CACHE_DIR"
+        python3 ${./binary-lock-shebangs.py} prepare "$TMPDIR/fixture" ${pkgs.bun}/bin/bun
+        source ${../nix/lib/patch-shebangs.sh}
+        patchBunShebangs "$TMPDIR/fixture"
+        python3 ${./binary-lock-shebangs.py} verify "$TMPDIR/fixture" ${pkgs.bun}/bin/bun
+        touch "$out"
+      '';
+  external-binary-lock =
+    pkgs.runCommand "test-external-binary-lock"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bun
+        ];
+      }
+      ''
+        python3 ${./external-binary-lock.py} --cli ${cli} --bun ${pkgs.bun}/bin/bun --work "$TMPDIR/probe"
+        touch "$out"
+      '';
+  workspace-only-lock =
+    pkgs.runCommand "test-workspace-only-lock"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bun
+        ];
+      }
+      ''
+        python3 ${./workspace-only-lock.py} --cli ${cli} --bun ${pkgs.bun}/bin/bun --work "$TMPDIR/probe"
         touch "$out"
       '';
   sandbox-local-network = localNetworkBoundary;
@@ -479,23 +619,25 @@ in
   # runs it (tests/cli.sh relock). Here `bun-purifier lock` finds every
   # lockfile current, so the command and the Nix library compute the same
   # digests of bun.lock, the manifests and the lockfile.
-  conformance-relock = pkgs.runCommand "test-conformance-relock" { } ''
-    export HOME=$TMPDIR
-    cp -r ${./fixtures} fixtures
-    cp -r ${./external} external
-    chmod -R u+w fixtures external
-    # The workspace fixture has no lockfile: bun.lock records everything.
-    test ! -e fixtures/workspace/bun-purifier.lock.json
-    for fixture in sources paths/app registries outdated; do
-      (cd fixtures/$fixture && ${cli} lock) 2> out
-      grep -q "is current" out || { cat out; exit 1; }
-    done
-    (cd external/src && ${cli} lock --lockfile ../bun-purifier.lock.json) 2> out
-    grep -q "is current" out || { cat out; exit 1; }
-    (cd external/src && ${cli} lock --lockfile ../tool/bun-purifier.lock.json --tool-lockfile ../tool/bun.lock) 2> out
-    grep -q "is current" out || { cat out; exit 1; }
-    touch $out
-  '';
+  conformance-relock =
+    pkgs.runCommand "test-conformance-relock" { nativeBuildInputs = [ pkgs.bun ]; }
+      ''
+        export HOME=$TMPDIR
+        cp -r ${./fixtures} fixtures
+        cp -r ${./external} external
+        chmod -R u+w fixtures external
+        # The workspace fixture has no lockfile: bun.lock records everything.
+        test ! -e fixtures/workspace/bun-purifier.lock.json
+        for fixture in sources paths/app registries outdated; do
+          (cd fixtures/$fixture && ${cli} lock) 2> out
+          grep -q "is current" out || { cat out; exit 1; }
+        done
+        (cd external/src && ${cli} lock --lockfile ../bun-purifier.lock.json) 2> out
+        grep -q "is current" out || { cat out; exit 1; }
+        (cd external/src && ${cli} lock --lockfile ../tool/bun-purifier.lock.json --tool-lockfile ../tool/bun.lock) 2> out
+        grep -q "is current" out || { cat out; exit 1; }
+        touch $out
+      '';
 
   # Two builds of the same fixtures give the same output.
   conformance-rebuild = allOf "conformance-rebuild" [
