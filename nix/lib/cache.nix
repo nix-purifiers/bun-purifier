@@ -68,7 +68,8 @@ let
         ''
           cp -r --no-dereference "$src" "$out"
           chmod -R u+w "$out"
-          patchShebangs --build "$out"
+          source ${./patch-shebangs.sh}
+          patchBunShebangs "$out"
         '';
 in
 # The manifest goes to the builder as a file, since a large project locks

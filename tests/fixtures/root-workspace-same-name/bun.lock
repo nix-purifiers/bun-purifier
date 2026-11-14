@@ -1,0 +1,19 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "fixture-collision",
+    },
+    "packages/public": {
+      "name": "fixture-collision",
+      "version": "1.0.0",
+      "bin": {
+        "fixture-collision": "./dist/index.js",
+      },
+    },
+  },
+  "packages": {
+    "fixture-collision": ["fixture-collision@workspace:packages/public"],
+  }
+}

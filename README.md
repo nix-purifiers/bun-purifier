@@ -15,6 +15,9 @@ to be committed.
 
 ## Quickstart
 
+Keep your existing Bun runtime on `PATH`. Local capture, prefetch and
+development use that runtime; they do not require a Nix Bun SDK.
+
 From the project root:
 
 ```zsh
@@ -139,6 +142,11 @@ returns
   project at `lib/node_modules/<name>`, and the executables of its `bin`
   field in `bin/`, run by bun. `packages.<name>.executables.<bin>` is the
   path of each executable.
+- `packagesByPath.<path>`: package wrappers by their exact source directory.
+  `packagesByPath.""` selects the root and `packagesByPath."packages/app"`
+  selects that workspace. Their `package` attribute retains the source
+  name, version, path and optional `private` value.
+- `releaseByPath.<path>`: the corresponding archive, with its `tarball` path.
 - `tests`: the `test` script of every package that has one, run in the
   sandbox on the built project.
 - `release.<name>`: the tarball of package `<name>`, as `bun pm pack`
@@ -152,6 +160,14 @@ returns
 Nix knows every one of these attributes, by name, at evaluation time.
 `bun.lock` lists the project's packages with their directories, and Nix
 reads the name, version and `bin` field of each from its `package.json`.
+
+When a root package shares a name with a workspace member, `packages.<name>`,
+`release.<name>` and the lock reader's named output select the workspace.
+The root remains available by its empty path. Strict packing retains both
+archives in separate directories, without changing either manifest. Two
+workspace members sharing a name are rejected, matching Bun's behavior.
+Path-based wrappers expose artifacts and executables; name-based projections
+remain on the canonical `packages.<name>` and `release.<name>` facades.
 
 `nix/lib/build-bun-project.nix` documents the other arguments:
 
@@ -355,9 +371,9 @@ outside.
 
 The lockfile records the version of bun that made it, because the names
 of cache entries follow the rules of that version. A build with a bun of
-another minor version prints a warning. The `bun-purifier` command runs
-the bun of its own package set, so `lock`, `prefetch` and `publish` agree
-with each other.
+another minor version prints a warning. Local lock and prefetch commands
+use the Bun selected from the caller's `PATH`. Optional full sandboxed
+builds and publication select their Nix SDK separately.
 
 ## Examples
 

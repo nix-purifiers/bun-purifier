@@ -44,6 +44,8 @@ with tempfile.TemporaryDirectory(prefix='bun-native-composition-') as temporary:
     sdk = Path(subprocess.check_output(['nix','build','--impure','--expr',
         'let f=builtins.getFlake ("path:"+builtins.getEnv "BUN_COMPOSITION_FLAKE"); in f.inputs.nixpkgs.legacyPackages.'+system+'.bun',
         '--out-link',str(temporary/'sdk'),'--print-out-paths'],env=env,text=True).strip())
+    # Supply the fixture's chosen runtime as the caller, not through the CLI.
+    env['PATH'] = str(sdk/'bin') + os.pathsep + env.get('PATH', '')
     project = temporary/'project'
     project.mkdir()
     manifest = {'name':'bun-composed','version':'1.0.0','license':'MIT','main':'index.js','dependencies':{'@fixture/lib':'>=99'},
