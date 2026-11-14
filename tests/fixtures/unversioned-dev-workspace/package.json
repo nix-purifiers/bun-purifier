@@ -1,0 +1,8 @@
+{
+  "name": "fixture-unversioned-dev-workspace",
+  "version": "1.0.0",
+  "workspaces": ["tooling", "versioned", "runtime"],
+  "dependencies": { "@fixture/runtime": "workspace:*" },
+  "devDependencies": { "@fixture/tooling": "workspace:*", "@fixture/versioned": "workspace:^" },
+  "scripts": { "build": "bun -e 'console.log(\"build completed\")'" }
+}
