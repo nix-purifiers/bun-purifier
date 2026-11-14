@@ -1,0 +1,10 @@
+diff --git a/package.json b/package.json
+index 5007c0574ddaa3388e5f109f7e4cdb237f325804..f71cfb7c43fae789b5ddb73933fe3233ca14d9ae 100644
+--- a/package.json
++++ b/package.json
+@@ -1,4 +1,5 @@
+ {
++  "purifierPatched": true,
+   "name": "kleur",
+   "version": "4.1.5",
+   "repository": "lukeed/kleur",

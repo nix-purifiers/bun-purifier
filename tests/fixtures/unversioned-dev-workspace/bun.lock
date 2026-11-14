@@ -1,0 +1,34 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "fixture-unversioned-dev-workspace",
+      "dependencies": {
+        "@fixture/runtime": "workspace:*",
+      },
+      "devDependencies": {
+        "@fixture/tooling": "workspace:*",
+        "@fixture/versioned": "workspace:^",
+      },
+    },
+    "runtime": {
+      "name": "@fixture/runtime",
+      "version": "1.2.3",
+    },
+    "tooling": {
+      "name": "@fixture/tooling",
+    },
+    "versioned": {
+      "name": "@fixture/versioned",
+      "version": "0.2.0",
+    },
+  },
+  "packages": {
+    "@fixture/runtime": ["@fixture/runtime@workspace:runtime"],
+
+    "@fixture/tooling": ["@fixture/tooling@workspace:tooling"],
+
+    "@fixture/versioned": ["@fixture/versioned@workspace:versioned"],
+  }
+}

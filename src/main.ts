@@ -43,16 +43,19 @@ import {
   copyFileSync,
   existsSync,
   lstatSync,
+  mkdtempSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   readlinkSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { withBoundNpmLock, withNpmInputs, type Repository } from "./npm-inputs";
+import { writablePatches } from "./writable-patches";
 import { isStale, LOCK_FILE, LockError, lock, lockedPackages, readBunLock, readLock } from "./lock";
 
 const usage = `usage:
@@ -101,13 +104,18 @@ function run(argv: string[], cwd: string, setup = false, variables: Record<strin
 }
 
 // Runs `body` with the bun.lock kept outside the tree in place of the
-// bun.lock in the tree, and restores the bun.lock in the tree afterwards,
+// bun.lock in the tree, and restores both source lockfiles afterwards,
 // also when `body` fails. With `write`, the bun.lock that `body` leaves
 // goes to the outside path.
 function withToolLockfile(root: string, outside: string | undefined, write: boolean, body: () => void): void {
   if (outside === undefined) return body();
   const tree = join(root, "bun.lock");
   const saved = existsSync(tree) ? readFileSync(tree) : undefined;
+  // Saving a text lock can remove bun.lockb, even with --lockfile-only.
+  const binary = join(root, "bun.lockb");
+  const binaryStat = lstatSync(binary, { throwIfNoEntry: false });
+  const binaryLink = binaryStat?.isSymbolicLink() ? readlinkSync(binary) : undefined;
+  const savedBinary = binaryStat && binaryLink === undefined ? readFileSync(binary) : undefined;
   if (existsSync(outside)) copyFileSync(outside, tree);
   else if (!write) fail(`${outside} does not exist. Run \`bun-purifier lock --tool-lockfile ${outside}\` to write it.`);
   try {
@@ -117,8 +125,37 @@ function withToolLockfile(root: string, outside: string | undefined, write: bool
       copyFileSync(tree, outside);
     }
   } finally {
-    if (saved !== undefined) writeFileSync(tree, saved);
-    else rmSync(tree, { force: true });
+    try {
+      if (saved !== undefined) writeFileSync(tree, saved);
+      else rmSync(tree, { force: true });
+    } finally {
+      const current = lstatSync(binary, { throwIfNoEntry: false });
+      let unchanged = false;
+      if (binaryLink !== undefined) {
+        unchanged = current?.isSymbolicLink() === true && readlinkSync(binary) === binaryLink;
+      } else if (savedBinary !== undefined && current?.isFile()) {
+        try {
+          unchanged = (current.mode & 0o7777) === (binaryStat!.mode & 0o7777)
+            && readFileSync(binary).equals(savedBinary);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "EACCES") throw error;
+        }
+      }
+      if (binaryStat === undefined) rmSync(binary, { force: true });
+      else if (!unchanged) {
+        // Prepare the replacement before touching a surviving source path.
+        const temporary = mkdtempSync(join(root, ".bun-lock-restore-"));
+        try {
+          const replacement = join(temporary, "bun.lockb");
+          if (binaryLink !== undefined) symlinkSync(binaryLink, replacement);
+          else {
+            writeFileSync(replacement, savedBinary!);
+            chmodSync(replacement, binaryStat.mode & 0o7777);
+          }
+          renameSync(replacement, binary);
+        } finally { rmSync(temporary, { recursive: true, force: true }); }
+      }
+    }
   }
 }
 
@@ -226,6 +263,7 @@ function prefetch(root: string, file: string, args: string[], views: Repository[
   makeRemovable(writable);
   rmSync(writable, { recursive: true, force: true });
   linkTree(cache, writable);
+  writablePatches(root, writable);
   // Bun prioritizes this variable over --cache-dir. Keep the offline
   // install on the prepared cache even when the caller configured another.
   withBoundNpmLock(root, views, () =>
