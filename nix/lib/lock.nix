@@ -269,8 +269,23 @@ let
     }
     // (if manifest ? name then { inherit (manifest) name; } else { })
     // (if manifest ? version then { inherit (manifest) version; } else { })
+    // (if manifest ? private then { inherit (manifest) private; } else { })
     // (if manifest ? bin then { inherit (manifest) bin; } else { })
   ) (builtins.attrNames bunLockData.workspaces);
+
+  namedPackages = builtins.filter (p: p ? name && p ? version) packages;
+  namedWorkspaces = builtins.filter (p: p.path != "") namedPackages;
+  namedRoot = builtins.filter (p: p.path == "") namedPackages;
+  workspaceGroups = builtins.groupBy (p: p.name) (
+    builtins.filter (p: p.path != "" && p ? name) packages
+  );
+  duplicateWorkspaceNames = builtins.filter (name: builtins.length workspaceGroups.${name} > 1) (
+    builtins.attrNames workspaceGroups
+  );
+  workspaceNameProblems = map (
+    name:
+    "bun-purifier: workspace name '${name}' is declared more than once. Bun requires unique workspace names."
+  ) duplicateWorkspaceNames;
 
   # What makes the lockfile unusable, each as a message that names the
   # command to run.
@@ -316,15 +331,23 @@ in
       else
         [ ]
     )
-    ++ (if integrityProblems == [ ] && !stale then entryProblems else [ ]);
+    ++ (if integrityProblems == [ ] && !stale then entryProblems ++ workspaceNameProblems else [ ]);
 
   # The fetch name of an entry: the last component of its cache path.
   artifactName = entry: storeName (baseNameOf entry.path);
 
+  # A named root is not a workspace member. Keep its identity separately
+  # when it shares a name with the actual member.
+  packagesByPath = builtins.listToAttrs (
+    map (p: {
+      name = p.path;
+      value = p;
+    }) namedPackages
+  );
   packagesByName = builtins.listToAttrs (
     map (p: {
       inherit (p) name;
       value = p;
-    }) (builtins.filter (p: p ? name && p ? version) packages)
+    }) (namedWorkspaces ++ namedRoot)
   );
 }
