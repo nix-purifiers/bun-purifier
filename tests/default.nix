@@ -109,7 +109,7 @@ let
   # recomputed, as a bug in the lock would leave it.
   negativeLock =
     name:
-    import ../nix/lib/lock.nix {
+    import ../lib-overlays/default/lock.nix {
       lockFile = ./negative/${name}/bun-purifier.lock.json;
       root = ./negative/${name};
     };
@@ -307,7 +307,7 @@ in
         export HOME=$TMPDIR/home BUN_INSTALL_CACHE_DIR=$TMPDIR/cache
         mkdir -p "$HOME" "$BUN_INSTALL_CACHE_DIR"
         python3 ${./binary-lock-shebangs.py} prepare "$TMPDIR/fixture" ${pkgs.bun}/bin/bun
-        source ${../nix/lib/patch-shebangs.sh}
+        source ${../pkgs/build-bun-project/patch-shebangs.sh}
         patchBunShebangs "$TMPDIR/fixture"
         python3 ${./binary-lock-shebangs.py} verify "$TMPDIR/fixture" ${pkgs.bun}/bin/bun
         touch "$out"

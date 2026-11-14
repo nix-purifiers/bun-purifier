@@ -21,7 +21,7 @@
 //     `bun publish` with it.
 //
 // The Nix package (pkgs/bun-purifier) runs this file with the bun the lock
-// is made with, and sets BUN_PURIFIER_LIB to nix/lib and
+// is made with, and sets BUN_PURIFIER_LIB to pkgs/bun-purifier and
 // BUN_PURIFIER_NIXPKGS to the nixpkgs the flake pins.
 //
 // An external build keeps its lockfiles outside the repository. Every
