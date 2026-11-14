@@ -174,6 +174,10 @@ let
     }
     // fetchers;
     entries = purifier.entriesFor system checkedLock;
+    interpreters = [
+      checkedBun
+      bunAsNode
+    ];
   };
 
   # The offline install, run in the project directory. bun writes into its
@@ -186,6 +190,7 @@ let
   installScript = ''
     cp -r --no-dereference ${cache} $TMPDIR/bun-cache
     chmod -R u+w $TMPDIR/bun-cache
+    bun ${../../src}/writable-patches.ts "$PWD" "$TMPDIR/bun-cache"
     ${
       lib.optionalString (dependencies != [ ]) ''
         bun ${../../src}/install-inputs.ts "$PWD" ${inputRepository.catalog} ${inputRepository} \
@@ -199,6 +204,12 @@ let
 
   # Packages with a name and a version: the ones `bun pm pack` can pack.
   namedPackages = lib.attrValues lock.packagesByName;
+  # Name projections use the canonical member; packing preserves every path.
+  allNamedPackages =
+    namedPackages
+    ++ builtins.filter (p: lock.packagesByName.${p.name}.path != p.path) (
+      lib.attrValues lock.packagesByPath
+    );
   workspacePackages = builtins.filter (p: p.path != "") lock.packages;
   rootPackage = lib.findFirst (p: p.path == "") null lock.packages;
 
@@ -216,7 +227,12 @@ let
       bun run ${lib.escapeShellArg script}
     '';
 
-  packDir = p: lock.storeName p.name;
+  packDir =
+    p:
+    lock.storeName p.name
+    + lib.optionalString (
+      lock.packagesByName.${p.name}.path != p.path
+    ) "/by-path/${builtins.hashString "sha256" p.path}";
   packagePath = p: "${rootPrefix}${if p.path == "" then "" else "${p.path}/"}";
 
   # Configure and build identically for native build output and strict packing.
@@ -241,8 +257,12 @@ let
       ${lib.optionalString replacesBunLock ''
         install -m 644 ${bunLock} bun.lock
       ''}
+      # Workspace/file dependency executables also need valid interpreters
+      # before Bun runs prepare/postinstall hooks during installation.
+      source ${./patch-shebangs.sh}
+      patchBunShebangs .
       ${installScript}
-      patchShebangs --build $(find . -name node_modules -type d -prune)
+      patchBunShebangs .
       runHook postConfigure
     '';
 
@@ -286,7 +306,7 @@ let
         ${lib.concatMapStrings (p: ''
           mkdir -p $packs/${packDir p}
           bun ${../../src}/pack.ts "$PWD" ${lib.escapeShellArg p.path} "$packs/${packDir p}"
-        '') namedPackages}
+        '') allNamedPackages}
         ${copyBuiltTree}
         runHook postInstall
       '';
@@ -318,14 +338,17 @@ let
     else
       p.bin;
 
-  packages = lib.mapAttrs (
-    name: p:
+  makePackage =
+    p:
     let
       drv =
-        runCommand "${packDir p}-${p.version}"
+        runCommand "${lock.storeName p.name}-${p.version}"
           {
             meta = lib.optionalAttrs (bins p != { }) { mainProgram = lib.head (lib.attrNames (bins p)); };
-            passthru = { inherit project; };
+            passthru = {
+              inherit project;
+              package = p;
+            };
           }
           ''
             mkdir -p $out/lib/node_modules/${builtins.dirOf p.name}
@@ -343,8 +366,17 @@ let
           '';
     in
     lib.extendDerivation true {
-      projections = projectionFor [ p.name ] // webProjectionFor p.name drv p.version;
       executables = lib.mapAttrs (bin: _: "${drv}/bin/${bin}") (bins p);
+    } drv;
+
+  packagesByPath = lib.mapAttrs (_: p: makePackage p) lock.packagesByPath;
+  packages = lib.mapAttrs (
+    name: p:
+    let
+      drv = packagesByPath.${p.path};
+    in
+    lib.extendDerivation true {
+      projections = projectionFor [ p.name ] // webProjectionFor p.name drv p.version;
     } drv
   ) lock.packagesByName;
 
@@ -374,19 +406,33 @@ let
   # Each release holds a package's tarball, and its `tarball` attribute is
   # the path of that file, known from the lockfile without building. The
   # build fails if bun named the file otherwise.
-  release = lib.mapAttrs (
-    name: p:
+  makeRelease =
+    p:
     let
-      drv = runCommand "${packDir p}-${p.version}.tgz" { passthru = { inherit project; }; } ''
-        mkdir $out
-        ln -s ${project.packs}/${packDir p}/${lib.escapeShellArg (packFile p)} $out/
-        test -e $out/${lib.escapeShellArg (packFile p)}
-      '';
+      drv =
+        runCommand "${lock.storeName p.name}-${p.version}.tgz"
+          {
+            passthru = {
+              inherit project;
+              package = p;
+            };
+          }
+          ''
+            mkdir $out
+            ln -s ${project.packs}/${packDir p}/${lib.escapeShellArg (packFile p)} $out/
+            test -e $out/${lib.escapeShellArg (packFile p)}
+          '';
     in
     lib.extendDerivation true {
       tarball = "${drv}/${packFile p}";
+    } drv;
+
+  releaseByPath = lib.mapAttrs (_: p: makeRelease p) lock.packagesByPath;
+  release = lib.mapAttrs (
+    name: p:
+    lib.extendDerivation true {
       projections = projectionFor [ p.name ];
-    } drv
+    } releaseByPath.${p.path}
   ) lock.packagesByName;
   capture =
     runCommand "bun-runtime-graph"
@@ -481,8 +527,10 @@ builtins.seq checkedLock {
     builtProject
     project
     packages
+    packagesByPath
     tests
     release
+    releaseByPath
     projections
     ;
   fetches = checkedLock.entries;
