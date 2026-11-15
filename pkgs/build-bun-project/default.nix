@@ -103,7 +103,7 @@ let
     providedVersions = inputSelection.versions;
   };
 
-  lock = import ./lock.nix (
+  lock = import ../../lib-overlays/default/lock.nix (
     {
       inherit lockFile bunLock;
       root = projectSrc;
@@ -115,7 +115,7 @@ let
   # The lock in the shape every nix-purifier gives, checked by the shared
   # library, which fails evaluation with its problems.
   checkedLock = purifier.checkLock (
-    import ./read-lock.nix { inherit lib purifier; } (
+    import ../../lib-overlays/default/read-lock.nix { inherit lib purifier; } (
       {
         inherit
           src

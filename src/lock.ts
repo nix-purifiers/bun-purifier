@@ -4,7 +4,7 @@
 // build from bun.lock and cannot find in it.
 //
 // bun.lock names every downloaded package with its URL and integrity
-// hash, and Nix reads it (nix/lib/bun-lock.nix). What bun.lock leaves out
+// hash, and Nix reads it (lib-overlays/default/bun-lock.nix). What bun.lock leaves out
 // is where bun keeps each package in its install cache, for the packages
 // whose cache names bun derives with internal hashes (prerelease versions,
 // tarball URLs); the NAR hash of a git checkout; which packages bun
@@ -32,7 +32,7 @@ import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, normalize, relative, resolve } from "node:path";
 import { parseJsonc } from "./jsonc";
 
-// nix/lib/lock-version.nix holds the same number.
+// lib-overlays/default/lock-version.nix holds the same number.
 export const LOCK_VERSION = 3;
 export const LOCK_FILE = "bun-purifier.lock.json";
 
@@ -49,11 +49,11 @@ const PLATFORMS: [os: string, cpu: string][] = [
 
 type Meta = { os?: string | string[]; cpu?: string | string[] };
 
-// The facts of a lock, as nix/lib/lock.nix reads them.
+// The facts of a lock, as lib-overlays/default/lock.nix reads them.
 export type Facts = {
   // The default registry, when it is not the npm registry.
   defaultRegistry?: string;
-  // The cache path of each package whose path nix/lib/lock.nix cannot
+  // The cache path of each package whose path lib-overlays/default/lock.nix cannot
   // derive from bun.lock, by bun.lock key.
   cachePaths: Record<string, string>;
   // The NAR hash of each git checkout, by bun.lock key.
@@ -93,13 +93,13 @@ export function canonicalJson(value: unknown): string {
 }
 
 // The digest of a lockfile, over everything but `contentHash` itself.
-// nix/lib/lock.nix recomputes it to tell a lockfile edited after the lock.
+// lib-overlays/default/lock.nix recomputes it to tell a lockfile edited after the lock.
 export function contentHash(lock: Omit<Lock, "contentHash"> | Lock): string {
   const { contentHash: _, ...rest } = lock as Lock;
   return createHash("sha256").update(canonicalJson(rest)).digest("hex");
 }
 
-// SHA-256 of bun.lock, which nix/lib/lock.nix recomputes to tell a stale
+// SHA-256 of bun.lock, which lib-overlays/default/lock.nix recomputes to tell a stale
 // lock.
 export function bunLockHash(root: string): string {
   return createHash("sha256").update(readFileSync(join(root, "bun.lock"))).digest("hex");
@@ -131,7 +131,7 @@ function manifestPath(path: string): string {
 }
 
 // The packages of the project: the workspaces of bun.lock, with the fields
-// of their manifests. nix/lib/lock.nix reads them the same way.
+// of their manifests. lib-overlays/default/lock.nix reads them the same way.
 export function lockedPackages(root: string, bunLock: BunLock): LockedPackage[] {
   return Object.keys(bunLock.workspaces)
     .sort((a, b) => a.localeCompare(b))
@@ -190,7 +190,7 @@ export function defaultRegistry(root: string): string {
 
 // The URL Nix fetches a git dependency from. The sandbox has no SSH keys,
 // so an SSH URL becomes the HTTPS URL of the same repository, which is
-// what bun falls back to as well. nix/lib/lock.nix has the same rule.
+// what bun falls back to as well. lib-overlays/default/lock.nix has the same rule.
 export function gitFetchUrl(resolution: string): string {
   const url = resolution.replace(/^git\+/, "").replace(/#.*$/, "");
   const ssh = /^ssh:\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/(.+)$/.exec(url);
@@ -363,7 +363,7 @@ function admitsAnyPlatform(meta: Meta): boolean {
 }
 
 // The facts of bun.lock that Nix needs and cannot derive, from the cache
-// the lock run filled. nix/lib/lock.nix derives the cache path of a
+// the lock run filled. lib-overlays/default/lock.nix derives the cache path of a
 // registry package as `<name>@<version>[@@<host>]@@@1`, of a GitHub
 // tarball as `@GH@<id>@@@1` and of a git checkout as `@G@<commit>`; the
 // facts record each path that differs, and every tarball URL. A package

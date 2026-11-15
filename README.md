@@ -169,7 +169,7 @@ workspace members sharing a name are rejected, matching Bun's behavior.
 Path-based wrappers expose artifacts and executables; name-based projections
 remain on the canonical `packages.<name>` and `release.<name>` facades.
 
-`nix/lib/build-bun-project.nix` documents the other arguments:
+`pkgs/build-bun-project/default.nix` documents the other arguments:
 
 - `root`: the project inside `src`, for `file:` dependencies outside the
   project (see Supported language repositories).

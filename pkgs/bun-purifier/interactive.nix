@@ -28,7 +28,7 @@ let
   purifierFlake = builtins.getFlake "github:${locked.owner}/${locked.repo}/${locked.rev}?narHash=${locked.narHash}";
   inherit (purifierFlake.lib) purifier;
 
-  lock = import ./read-lock.nix { inherit lib purifier; } {
+  lock = import ../../lib-overlays/default/read-lock.nix { inherit lib purifier; } {
     src = /. + src;
     lockFile = /. + lockFile;
   };
@@ -49,7 +49,7 @@ in
       repository.metadata
     ];
 
-  cache = import ./cache.nix { inherit lib purifier; } {
+  cache = import ../build-bun-project/cache.nix { inherit lib purifier; } {
     inherit (pkgs) runCommand;
     fetchers = { inherit pkgs; };
     entries = purifier.entriesFor system lock;
@@ -57,7 +57,7 @@ in
 
   npmPublication =
     let
-      buildBunProject = pkgs.callPackage ./build-bun-project.nix { inherit purifier; };
+      buildBunProject = pkgs.callPackage ../build-bun-project { inherit purifier; };
       build = buildBunProject {
         src = /. + src;
         lockFile = /. + lockFile;
@@ -72,7 +72,7 @@ in
 
   release =
     let
-      buildBunProject = pkgs.callPackage ./build-bun-project.nix { inherit purifier; };
+      buildBunProject = pkgs.callPackage ../build-bun-project { inherit purifier; };
       build = buildBunProject {
         src = /. + src;
         lockFile = /. + lockFile;

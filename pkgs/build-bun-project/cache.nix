@@ -28,7 +28,7 @@
   interpreters ? [ ],
 }:
 let
-  storeName = import ./store-name.nix;
+  storeName = import ../../lib-overlays/default/store-name.nix;
 
   fetchEntry = purifier.fetchEntry fetchers;
 

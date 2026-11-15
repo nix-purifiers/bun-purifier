@@ -172,7 +172,7 @@ publish() {
   wait
   local jq lib nixpkgs expected
   jq=$(nix build --no-link --print-out-paths --inputs-from . 'nixpkgs#jq.bin')/bin/jq
-  lib=$(dirname "$cli")/../share/bun-purifier/nix/lib
+  lib=$(dirname "$cli")/../share/bun-purifier/pkgs/bun-purifier
   nixpkgs=$(grep -o "BUN_PURIFIER_NIXPKGS='[^']*'" "$cli" | cut -d"'" -f2)
   expected=$(nix build --no-link --print-out-paths --file "$lib/interactive.nix" \
     --argstr nixpkgs "$nixpkgs" --argstr src "$work/publish" \
@@ -197,7 +197,7 @@ update() {
 
 nix_errors() {
   local lib nixpkgs
-  lib=$(dirname "$cli")/../share/bun-purifier/nix/lib
+  lib=$(dirname "$cli")/../share/bun-purifier/pkgs/bun-purifier
   nixpkgs=$(grep -o "BUN_PURIFIER_NIXPKGS='[^']*'" "$cli" | cut -d"'" -f2)
   fails_with 'not valid JSON. Run `bun-purifier lock --force`' \
     nix build --no-link --file "$lib/interactive.nix" --argstr nixpkgs "$nixpkgs" \

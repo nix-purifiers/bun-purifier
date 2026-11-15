@@ -8,11 +8,11 @@
   # The bun-purifier command: `lock`, `update`, `prefetch` and `publish`.
   bun-purifier = callPackage ./bun-purifier { inherit (lib) purifier; };
 
-  # The sandboxed builds of a bun project (nix/lib/build-bun-project.nix). A
+  # The sandboxed builds of a bun project (pkgs/build-bun-project). A
   # package for callPackage in this scope, so `buildBunProject.override`
   # replaces what it takes, and an overlay on the scope with
   # `overrideScope` replaces what every package in the scope shares.
-  buildBunProject = callPackage ../nix/lib/build-bun-project.nix {
+  buildBunProject = callPackage ./build-bun-project {
     inherit (lib) purifier;
   };
 }
